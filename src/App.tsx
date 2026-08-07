@@ -1,98 +1,120 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  AuthenticatedTemplate,
-  UnauthenticatedTemplate,
-  useMsal
-} from "@azure/msal-react";
-import { loginRequest } from "./auth";
+import { useGoogleLogin, googleLogout } from "@react-oauth/google";
 import { appConfig, getConfigurationProblems } from "./config";
 import { EntryForm } from "./components/EntryForm";
 import { RecentRows } from "./components/RecentRows";
-import { getRecentRows } from "./lib/graph";
+import { getRecentRows, getRutas, type RecentRow, type Ruta } from "./lib/graph";
+import { GOOGLE_SCOPES } from "./auth";
 
 export default function App() {
-  const { instance, accounts } = useMsal();
-  const [rows, setRows] = useState<unknown[][]>([]);
+  const [accessToken, setAccessToken] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [rows, setRows] = useState<RecentRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [rowError, setRowError] = useState("");
+  const [rutas, setRutas] = useState<Ruta[]>([]);
+  const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
   const configurationProblems = getConfigurationProblems();
 
   const refreshRows = useCallback(async () => {
-    const account = accounts[0];
-    if (!account || configurationProblems.length > 0) return;
+    if (!accessToken || configurationProblems.length > 0) return;
 
     setLoadingRows(true);
     setRowError("");
     try {
-      setRows(await getRecentRows(instance, account));
+      const [rowsData, rutasData] = await Promise.all([getRecentRows(accessToken), getRutas(accessToken)]);
+      setRows(rowsData);
+      setRutas(rutasData);
     } catch (error) {
-      setRowError(error instanceof Error ? error.message : "Could not load workbook rows.");
+      setRowError(error instanceof Error ? error.message : "Could not load spreadsheet rows.");
     } finally {
       setLoadingRows(false);
     }
-  }, [accounts, configurationProblems.length, instance]);
+  }, [accessToken, configurationProblems.length]);
 
   useEffect(() => {
     void refreshRows();
   }, [refreshRows]);
 
-  async function signIn() {
-    await instance.loginPopup(loginRequest);
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setAccessToken(tokenResponse.access_token);
+
+      const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      });
+      const userInfo = await userInfoResponse.json();
+      setUserEmail(userInfo.email);
+    },
+    scope: GOOGLE_SCOPES,
+  });
+
+  function signOut() {
+    googleLogout();
+    setAccessToken("");
+    setUserEmail("");
+    setRows([]);
   }
 
-  async function signOut() {
-    await instance.logoutPopup({ account: accounts[0] });
-  }
+  const isAuthenticated = Boolean(accessToken);
 
   return (
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Microsoft 365 PWA</p>
-          <h1>Office Excel App</h1>
+          <p className="eyebrow">La Nona</p>
+          <h1>Registro de Ventas</h1>
         </div>
 
-        <AuthenticatedTemplate>
-          <button className="secondary" onClick={signOut}>Sign out</button>
-        </AuthenticatedTemplate>
+        {isAuthenticated && (
+          <button className="secondary" onClick={signOut}>
+            Cerrar sesión
+          </button>
+        )}
       </header>
 
       {configurationProblems.length > 0 && (
         <section className="card warning">
-          <h2>Configuration required</h2>
-          <p>Copy <code>.env.example</code> to <code>.env.local</code> and fix:</p>
+          <h2>Configuración requerida</h2>
+          <p>
+            Copia <code>.env.example</code> a <code>.env.local</code> y corrige:
+          </p>
           <ul>
-            {configurationProblems.map((problem) => <li key={problem}>{problem}</li>)}
+            {configurationProblems.map((problem) => (
+              <li key={problem}>{problem}</li>
+            ))}
           </ul>
         </section>
       )}
 
-      <UnauthenticatedTemplate>
+      {!isAuthenticated && (
         <section className="hero card">
           <div>
-            <p className="eyebrow">One sign-in</p>
-            <h2>Use the same app on your phone, tablet, and computer.</h2>
-            <p className="muted">
-              Data is written directly to the configured Excel table through Microsoft Graph.
-            </p>
+            <p className="eyebrow">Un solo inicio de sesión</p>
+            <h2>Usa la misma app en tu teléfono, tableta y computadora.</h2>
+            <p className="muted">Los datos se escriben directamente en la hoja de Google configurada.</p>
           </div>
-          <button onClick={signIn} disabled={configurationProblems.length > 0}>
-            Sign in with Microsoft
+          <button onClick={() => login()} disabled={configurationProblems.length > 0}>
+            Iniciar sesión con Google
           </button>
         </section>
-      </UnauthenticatedTemplate>
+      )}
 
-      <AuthenticatedTemplate>
-        <section className="account-strip">
-          Signed in as <strong>{accounts[0]?.username}</strong>
-          <span>Table: <code>{appConfig.excel.tableName}</code></span>
-        </section>
+      {isAuthenticated && (
+        <>
+          <section className="account-strip">
+            Sesión iniciada como <strong>{userEmail}</strong>
+            <span>
+              Hoja: <code>{appConfig.sheets.sheetName}</code>
+            </span>
+          </section>
 
-        <div className="grid">
-          <EntryForm onSaved={refreshRows} />
-          <RecentRows rows={rows} loading={loadingRows} error={rowError} />
-        </div>
-      </AuthenticatedTemplate>
+          <div className="grid">
+            <EntryForm onSaved={refreshRows} accessToken={accessToken} editingRow={editingRow} onCancelEdit={() => setEditingRow(null)} />
+            <RecentRows rows={rows} rutas={rutas} loading={loadingRows} error={rowError} accessToken={accessToken} onRefresh={refreshRows} onEdit={setEditingRow} />
+          </div>
+        </>
+      )}
     </main>
   );
 }

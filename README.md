@@ -1,14 +1,14 @@
-# Office Excel PWA
+# Google Sheets PWA
 
-A React + TypeScript progressive web app that signs users in with Microsoft and reads/writes rows in an Excel Online **table** using Microsoft Graph.
+A React + TypeScript progressive web app that signs users in with Google and reads/writes rows in a Google Sheet using the Google Sheets API.
 
 ## What is already included
 
 - Vite + React + TypeScript
 - Installable PWA manifest and service worker
-- Microsoft authentication with `@azure/msal-react`
-- Graph access-token handling
-- Example form that appends `[Date, Description, Amount]` to an Excel table
+- Google authentication with `@react-oauth/google`
+- Google Sheets API integration
+- Example form that appends `[Date, Description, Amount]` to a Google Sheet
 - Recent-row display
 - Environment-based configuration; no client secret is used or needed
 
@@ -28,53 +28,38 @@ copy .env.example .env.local
 
 The development URL is normally `http://localhost:5173`.
 
-## 2. Register the app in Microsoft Entra
+## 2. Set up Google Cloud Project
 
-1. Open the Microsoft Entra admin center.
-2. Go to **App registrations** → **New registration**.
-3. Choose the supported account type:
-   - Organization only: use your tenant.
-   - Work/school plus personal Microsoft accounts: choose the broad multitenant/personal option and use `common` in `.env.local`.
-4. Under **Authentication**, add a **Single-page application** redirect URI:
-   - `http://localhost:5173`
-5. Under **API permissions**, add delegated Microsoft Graph permissions:
-   - `User.Read`
-   - `Files.ReadWrite`
-6. Copy the **Application (client) ID** into `VITE_MS_CLIENT_ID`.
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the **Google Sheets API**:
+   - Go to **APIs & Services** → **Library**
+   - Search for "Google Sheets API" and enable it
+4. Create OAuth 2.0 credentials:
+   - Go to **APIs & Services** → **Credentials**
+   - Click **Create Credentials** → **OAuth client ID**
+   - Choose **Web application**
+   - Add authorized JavaScript origins:
+     - `http://localhost:5173`
+   - Copy the **Client ID** into `VITE_GOOGLE_CLIENT_ID` in `.env.local`
 
 A browser-based SPA must **not** contain a client secret. Anything prefixed with `VITE_` is shipped to the browser and is public configuration.
 
-## 3. Prepare the workbook
+## 3. Prepare the Google Sheet
 
-Create an `.xlsx` workbook in OneDrive or SharePoint. In Excel Online:
+1. Create a new Google Sheet or open an existing one
+2. Add headers in the first row: `Date`, `Description`, `Amount`
+3. Name the sheet tab (e.g., `Ventas`)
+4. Copy the spreadsheet ID from the URL:
+   - URL format: `https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit`
+5. Update `.env.local`:
+   ```env
+   VITE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id-here
+   VITE_SHEETS_SHEET_NAME=Ventas
+   ```
+6. Share the spreadsheet with your Google account (the one you'll sign in with)
 
-1. Add headers in this order: `Date`, `Description`, `Amount`.
-2. Select the header/data area and choose **Insert → Table**.
-3. Give the table a name, such as `Entries`.
-4. Set `VITE_EXCEL_TABLE_NAME=Entries`.
-
-The sample app adds rows to a table. A plain worksheet range is not enough for the included `rows/add` endpoint.
-
-## 4. Point the app at the workbook
-
-### Option A: Signed-in user's OneDrive path
-
-```env
-VITE_EXCEL_FILE_PATH=/Apps/MyApp/data.xlsx
-```
-
-### Option B: Drive and item IDs
-
-Useful for SharePoint or a workbook stored in another drive:
-
-```env
-VITE_EXCEL_DRIVE_ID=your-drive-id
-VITE_EXCEL_ITEM_ID=your-workbook-item-id
-```
-
-When using IDs, remove or leave `VITE_EXCEL_FILE_PATH` blank.
-
-## 5. Production deployment
+## 4. Production deployment
 
 Run:
 
@@ -82,24 +67,23 @@ Run:
 npm run build
 ```
 
-Deploy the generated `dist/` folder to any HTTPS static host. Then add the production URL as another **Single-page application redirect URI** in the Entra app registration and update `VITE_MS_REDIRECT_URI` before building.
+Deploy the generated `dist/` folder to any HTTPS static host. Then add the production URL as an **authorized JavaScript origin** in your Google Cloud OAuth client settings.
 
-Common free/cheap static hosts include Azure Static Web Apps, Cloudflare Pages, Netlify, and Vercel. The PWA must be served over HTTPS to install normally outside localhost.
+Common free/cheap static hosts include Cloudflare Pages, Netlify, and Vercel. The PWA must be served over HTTPS to install normally outside localhost.
 
 ## Security notes
 
 - Do not create or store a client secret in this app.
-- Delegated Graph permissions mean the app acts as the signed-in user.
-- Prefer the narrowest permissions that satisfy the workbook location and sharing model.
+- The app requests only Google Sheets API access and acts as the signed-in user.
 - `.env.local` is ignored by Git, but the client ID is not actually secret; it is separated for configuration convenience.
-- For a shared organizational workbook, administrators may need to consent to permissions or configure access policies depending on tenant rules.
+- Users must have access to the Google Sheet you configure.
 
 ## Customize the row schema
 
 Change the form fields in `src/components/EntryForm.tsx`, the `EntryRow` interface, and this array in `src/lib/graph.ts`:
 
 ```ts
-values: [[entry.date, entry.description, entry.amount]]
+values: [[entry.date, entry.description, entry.amount]];
 ```
 
-The value order must match the Excel table's column order.
+The value order must match the Google Sheet's column order.
