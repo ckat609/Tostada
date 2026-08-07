@@ -164,13 +164,13 @@ export async function getRecentRows(
   const dataRows = allRows.slice(1);
   const mappedRows = dataRows
     .map((row, index) => {
-      const clienteValue = clienteIndex !== -1 ? String(row[clienteIndex] ?? "").trim() : "";
-      const clienteData = clientes.find(c => c.cliente === clienteValue);
+      const clienteCodigo = clienteIndex !== -1 ? String(row[clienteIndex] ?? "").trim() : "";
+      const clienteData = clientes.find(c => c.codigo === clienteCodigo);
 
       return {
         fecha: fechaIndex !== -1 ? String(row[fechaIndex] ?? "") : "",
         ruta: clienteData?.ruta || "",
-        cliente: clienteValue,
+        cliente: clienteData?.cliente || clienteCodigo, // Display cliente name, fallback to codigo
         descripcion: descripcionIndex !== -1 ? String(row[descripcionIndex] ?? "") : "",
         presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "") : "",
         tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "") : "",
@@ -411,9 +411,14 @@ export async function updateRow(
   const { spreadsheetId, sheetName } = appConfig.sheets;
 
   // Get headers to determine column order
-  const getUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
-  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, getUrl);
+  const headersUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
+  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, headersUrl);
   const headers = headerResponse.values?.[0] ?? [];
+
+  // Get existing row to preserve fields we're not updating (like codigo)
+  const existingRowUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}:${rowIndex}`;
+  const existingRowResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, existingRowUrl);
+  const existingRow = existingRowResponse.values?.[0] ?? [];
 
   const fechaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "fecha"
@@ -437,15 +442,21 @@ export async function updateRow(
     (header) => String(header).toLowerCase() === "estado"
   );
 
-  // Build row array matching the actual column order
-  const row = new Array(headers.length).fill("");
+  // Start with existing row to preserve all fields (like codigo)
+  const row = [...existingRow];
+  // Ensure row has enough elements for all headers
+  while (row.length < headers.length) {
+    row.push("");
+  }
+
+  // Update only the fields we're changing
   if (fechaIndex !== -1) row[fechaIndex] = entry.fecha;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
-  if (estadoIndex !== -1) row[estadoIndex] = entry.estado || ""; // Preserve estado when updating
+  if (estadoIndex !== -1 && entry.estado !== undefined) row[estadoIndex] = entry.estado;
 
   const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
   await sheetsRequest(accessToken, updateUrl, {

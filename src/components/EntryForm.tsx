@@ -204,34 +204,24 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     void fetchClientes();
   }, [accessToken]);
 
-  useEffect(() => {
-    setProductoCodigo("");
-    setTamanoCodigo("");
-  }, [description]);
-
-  useEffect(() => {
-    setCliente("");
-  }, [ruta]);
-
   // Load editing row data
   useEffect(() => {
-    if (editingRow) {
+    if (editingRow && productos.length > 0 && rutas.length > 0 && presentaciones.length > 0 && tamanos.length > 0) {
+      // Find ruta name from codigo
+      const rutaData = rutas.find(r => r.codigo === editingRow.ruta);
+
+      // Find producto name from codigo
+      const productoData = productos.find(p => p.codigo === editingRow.descripcion);
+
       setDate(editingRow.fecha);
-      setRuta(editingRow.ruta);
+      setRuta(rutaData?.ruta || "");
       setCliente(editingRow.cliente);
-      // The presentacion and tamano codes are stored in editingRow
-      // Find which producto has this presentacion code
-      const producto = productos.find(p =>
-        p.presentacion.split(',').map(c => c.trim()).includes(editingRow.presentacion)
-      );
-      if (producto) {
-        setDescription(producto.descripcion);
-        setProductoCodigo(editingRow.presentacion);
-        setTamanoCodigo(editingRow.tamano);
-      }
+      setDescription(productoData?.descripcion || "");
+      setProductoCodigo(editingRow.presentacion);
+      setTamanoCodigo(editingRow.tamano);
       setAmount(editingRow.cantidad);
     }
-  }, [editingRow, productos]);
+  }, [editingRow, productos, rutas, presentaciones, tamanos]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -247,16 +237,33 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       return;
     }
 
+    // Find cliente codigo from cliente name
+    const clienteData = clientes.find(c => c.cliente === cliente);
+    if (!clienteData) {
+      setStatus("Cliente no encontrado.");
+      return;
+    }
+
+    // Find producto codigo from descripcion
+    const productoData = productos.find(p => p.descripcion === description);
+    if (!productoData) {
+      setStatus("Producto no encontrado.");
+      return;
+    }
+
     setSaving(true);
     setStatus("");
 
+    // Generate timestamp in UTC
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19); // Format: "2026-08-07 14:30:45" in UTC
+
     try {
       if (editingRow) {
-        // Update existing row
+        // Update existing row - keep original timestamp
         await updateRow(accessToken, editingRow.rowIndex, {
-          fecha: date,
-          cliente: cliente,
-          descripcion: description.trim(),
+          fecha: editingRow.fecha, // Keep original timestamp when editing
+          cliente: clienteData.codigo, // Store cliente codigo
+          descripcion: productoData.codigo, // Store producto codigo
           presentacion: productoCodigo, // Store presentacion codigo
           tamano: tamanoCodigo, // Store tamano codigo
           cantidad: parsedAmount
@@ -272,11 +279,11 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         setTamanoCodigo("");
         setAmount("");
       } else {
-        // Add new row
+        // Add new row - use timestamp for new entries
         await addEntryRow(accessToken, {
-          fecha: date,
-          cliente: cliente,
-          descripcion: description.trim(),
+          fecha: timestamp, // Store timestamp instead of just date
+          cliente: clienteData.codigo, // Store cliente codigo
+          descripcion: productoData.codigo, // Store producto codigo
           presentacion: productoCodigo, // Store presentacion codigo
           tamano: tamanoCodigo, // Store tamano codigo
           cantidad: parsedAmount
@@ -611,6 +618,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                   key={r.codigo}
                   onClick={() => {
                     setRuta(r.ruta);
+                    setCliente(""); // Reset cliente when ruta changes
                     setActiveModal(null);
                   }}
                   style={{
@@ -659,7 +667,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                   key={desc}
                   onClick={() => {
                     setDescription(desc);
-                    setProductoCodigo("");
+                    setProductoCodigo(""); // Reset presentacion when producto changes
+                    setTamanoCodigo(""); // Reset tamano when producto changes
                     setActiveModal(null);
                   }}
                   style={{
