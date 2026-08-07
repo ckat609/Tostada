@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { addEntryRow, updateRow, getProductos, getRutas, getClientes, type Producto, type Ruta, type Cliente, type RecentRow } from "../lib/graph";
+import { createPortal } from "react-dom";
+import { addEntryRow, updateRow, getProductos, getPresentaciones, getTamanos, getRutas, getClientes, type Producto, type Presentacion, type Tamano, type Ruta, type Cliente, type RecentRow } from "../lib/graph";
 
 interface EntryFormProps {
   onSaved: () => void | Promise<void>;
@@ -8,20 +9,25 @@ interface EntryFormProps {
   onCancelEdit: () => void;
 }
 
-type ModalType = "ruta" | "cliente" | "producto" | "cantidad" | "fecha" | null;
+type ModalType = "ruta" | "cliente" | "producto" | "presentacion" | "tamano" | "cantidad" | "fecha" | null;
 
 export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: EntryFormProps) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [ruta, setRuta] = useState("");
   const [cliente, setCliente] = useState("");
   const [description, setDescription] = useState("");
-  const [presentacion, setPresentacion] = useState("");
+  const [productoCodigo, setProductoCodigo] = useState(""); // Store the presentacion codigo
+  const [tamanoCodigo, setTamanoCodigo] = useState(""); // Store the tamano codigo
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [productosError, setProductosError] = useState<string>("");
+  const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
+  const [loadingPresentaciones, setLoadingPresentaciones] = useState(false);
+  const [tamanos, setTamanos] = useState<Tamano[]>([]);
+  const [loadingTamanos, setLoadingTamanos] = useState(false);
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [loadingRutas, setLoadingRutas] = useState(false);
   const [rutasError, setRutasError] = useState<string>("");
@@ -30,14 +36,65 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [clientesError, setClientesError] = useState<string>("");
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (activeModal) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      const originalBodyPosition = document.body.style.position;
+
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+        document.body.style.position = originalBodyPosition;
+        document.body.style.width = '';
+      };
+    }
+  }, [activeModal]);
+
   // Calendar state
   const currentDate = new Date(date);
   const [viewYear, setViewYear] = useState(currentDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
 
-  const selectedProducto = productos.find(p => p.descripcion === description);
   const selectedRuta = rutas.find(r => r.ruta === ruta);
   const filteredClientes = selectedRuta ? clientes.filter(c => c.ruta === selectedRuta.codigo) : [];
+
+  // Get unique descripciones
+  const uniqueDescripciones = [...new Set(productos.map(p => p.descripcion))].sort();
+
+  // Get productos that match the selected description
+  const productosForDescription = productos.filter(p => p.descripcion === description);
+
+  // Get available presentaciones for selected producto
+  const selectedProductoData = productosForDescription[0]; // All productos with same descripcion share presentaciones
+  const availablePresentaciones = selectedProductoData
+    ? selectedProductoData.presentacion
+        .split(',')
+        .map(codigo => codigo.trim())
+        .map(codigo => presentaciones.find(p => p.codigo === codigo))
+        .filter((p): p is Presentacion => p !== undefined)
+    : [];
+
+  // Get selected presentacion by codigo
+  const selectedPresentacion = presentaciones.find(p => p.codigo === productoCodigo);
+
+  // Get available tamanos for selected producto
+  const availableTamanos = selectedProductoData
+    ? selectedProductoData.tamano
+        .split(',')
+        .map(codigo => codigo.trim())
+        .map(codigo => tamanos.find(t => t.codigo === codigo))
+        .filter((t): t is Tamano => t !== undefined)
+    : [];
+
+  // Get selected tamano by codigo
+  const selectedTamano = tamanos.find(t => t.codigo === tamanoCodigo);
 
   useEffect(() => {
     async function fetchProductos() {
@@ -61,6 +118,42 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
 
     void fetchProductos();
+  }, [accessToken]);
+
+  useEffect(() => {
+    async function fetchPresentaciones() {
+      if (!accessToken) return;
+
+      setLoadingPresentaciones(true);
+      try {
+        const pres = await getPresentaciones(accessToken);
+        setPresentaciones(pres);
+      } catch (error) {
+        console.error("Could not load presentaciones:", error);
+      } finally {
+        setLoadingPresentaciones(false);
+      }
+    }
+
+    void fetchPresentaciones();
+  }, [accessToken]);
+
+  useEffect(() => {
+    async function fetchTamanos() {
+      if (!accessToken) return;
+
+      setLoadingTamanos(true);
+      try {
+        const tams = await getTamanos(accessToken);
+        setTamanos(tams);
+      } catch (error) {
+        console.error("Could not load tamanos:", error);
+      } finally {
+        setLoadingTamanos(false);
+      }
+    }
+
+    void fetchTamanos();
   }, [accessToken]);
 
   useEffect(() => {
@@ -112,7 +205,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   }, [accessToken]);
 
   useEffect(() => {
-    setPresentacion("");
+    setProductoCodigo("");
+    setTamanoCodigo("");
   }, [description]);
 
   useEffect(() => {
@@ -125,11 +219,19 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       setDate(editingRow.fecha);
       setRuta(editingRow.ruta);
       setCliente(editingRow.cliente);
-      setDescription(editingRow.descripcion);
-      setPresentacion(editingRow.presentacion);
+      // The presentacion and tamano codes are stored in editingRow
+      // Find which producto has this presentacion code
+      const producto = productos.find(p =>
+        p.presentacion.split(',').map(c => c.trim()).includes(editingRow.presentacion)
+      );
+      if (producto) {
+        setDescription(producto.descripcion);
+        setProductoCodigo(editingRow.presentacion);
+        setTamanoCodigo(editingRow.tamano);
+      }
       setAmount(editingRow.cantidad);
     }
-  }, [editingRow]);
+  }, [editingRow, productos]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,7 +242,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
 
     const parsedAmount = Number(amount);
-    if (!date || !ruta || !cliente || !description.trim() || !presentacion || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    if (!date || !ruta || !cliente || !description.trim() || !productoCodigo || !tamanoCodigo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setStatus("Por favor completa todos los campos requeridos.");
       return;
     }
@@ -155,7 +257,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           fecha: date,
           cliente: cliente,
           descripcion: description.trim(),
-          presentacion: presentacion || "",
+          presentacion: productoCodigo, // Store presentacion codigo
+          tamano: tamanoCodigo, // Store tamano codigo
           cantidad: parsedAmount
         });
         setStatus("Actualizado exitosamente.");
@@ -165,7 +268,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         setRuta("");
         setCliente("");
         setDescription("");
-        setPresentacion("");
+        setProductoCodigo("");
+        setTamanoCodigo("");
         setAmount("");
       } else {
         // Add new row
@@ -173,7 +277,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           fecha: date,
           cliente: cliente,
           descripcion: description.trim(),
-          presentacion: presentacion || "",
+          presentacion: productoCodigo, // Store presentacion codigo
+          tamano: tamanoCodigo, // Store tamano codigo
           cantidad: parsedAmount
         });
         setAmount("");
@@ -194,7 +299,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     setRuta("");
     setCliente("");
     setDescription("");
-    setPresentacion("");
+    setProductoCodigo("");
+    setTamanoCodigo("");
     setAmount("");
     setStatus("");
   }
@@ -229,7 +335,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           {new Date(date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </button>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        <div className="two-col-grid">
           <div>
             <button
               type="button"
@@ -300,33 +406,47 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           {productosError && <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>{productosError}</p>}
         </div>
 
-        {selectedProducto && selectedProducto.presentaciones.length > 0 && (
-          <div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "0.75rem" }}>
-              {selectedProducto.presentaciones.map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  onClick={() => setPresentacion(size)}
-                  style={{
-                    padding: "1rem",
-                    fontSize: "1.1rem",
-                    fontWeight: "600",
-                    border: presentacion === size ? "3px solid #2196F3" : "2px solid #ddd",
-                    backgroundColor: presentacion === size ? "#e3f2fd" : "white",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    minHeight: "56px",
-                    transition: "all 0.2s",
-                    color: "#000"
-                  }}
-                >
-                  {size}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="two-col-grid">
+          <button
+            type="button"
+            onClick={() => setActiveModal("presentacion")}
+            disabled={!description || loadingProductos}
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "1.1rem",
+              minHeight: "56px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: "white",
+              cursor: "pointer",
+              textAlign: "left",
+              color: selectedPresentacion ? "#000" : "#666"
+            }}
+          >
+            {!description ? "Selecciona producto" : selectedPresentacion?.presentacion || "Presentación"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveModal("tamano")}
+            disabled={!description || loadingProductos}
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "1.1rem",
+              minHeight: "56px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: "white",
+              cursor: "pointer",
+              textAlign: "left",
+              color: selectedTamano ? "#000" : "#666"
+            }}
+          >
+            {!description ? "Selecciona producto" : selectedTamano?.tamano || "Tamaño"}
+          </button>
+        </div>
 
         <div>
           <button
@@ -372,7 +492,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           )}
           <button
             type="submit"
-            disabled={saving || !date || !ruta || !cliente || !description || !presentacion || !amount}
+            disabled={saving || !date || !ruta || !cliente || !description || !productoCodigo || !tamanoCodigo || !amount}
             style={{
               flex: 1,
               padding: "1.25rem",
@@ -390,7 +510,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       </form>
 
       {/* Selection Modals */}
-      {activeModal && (
+      {activeModal && createPortal(
         <div
           style={{
             position: "fixed",
@@ -402,7 +522,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-end",
-            zIndex: 1000
+            zIndex: 1000,
+            overflow: "auto"
           }}
           onClick={() => setActiveModal(null)}
         >
@@ -428,6 +549,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                 {activeModal === "ruta" && "Selecciona Ruta"}
                 {activeModal === "cliente" && "Selecciona Cliente"}
                 {activeModal === "producto" && "Selecciona Producto"}
+                {activeModal === "presentacion" && "Selecciona Presentación"}
+                {activeModal === "tamano" && "Selecciona Tamaño"}
                 {activeModal === "cantidad" && "Ingresa Cantidad"}
                 {activeModal === "fecha" && "Selecciona Fecha"}
               </h3>
@@ -453,7 +576,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
               gap: "0.75rem"
             }}>
-              {activeModal === "ruta" && rutas.map((r) => (
+              {activeModal === "ruta" && [...rutas].sort((a, b) => a.ruta.localeCompare(b.ruta)).map((r) => (
                 <button
                   key={r.codigo}
                   onClick={() => {
@@ -477,7 +600,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                   {r.ruta}
                 </button>
               ))}
-              {activeModal === "cliente" && filteredClientes.map((c) => (
+              {activeModal === "cliente" && [...filteredClientes].sort((a, b) => a.cliente.localeCompare(b.cliente)).map((c) => (
                 <button
                   key={c.cliente}
                   onClick={() => {
@@ -501,11 +624,12 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                   {c.cliente}
                 </button>
               ))}
-              {activeModal === "producto" && productos.map((p) => (
+              {activeModal === "producto" && uniqueDescripciones.map((desc) => (
                 <button
-                  key={p.descripcion}
+                  key={desc}
                   onClick={() => {
-                    setDescription(p.descripcion);
+                    setDescription(desc);
+                    setProductoCodigo("");
                     setActiveModal(null);
                   }}
                   style={{
@@ -513,8 +637,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                     fontSize: "1.1rem",
                     fontWeight: "600",
                     border: "2px solid #ddd",
-                    backgroundColor: description === p.descripcion ? "#e3f2fd" : "white",
-                    borderColor: description === p.descripcion ? "#2196F3" : "#ddd",
+                    backgroundColor: description === desc ? "#e3f2fd" : "white",
+                    borderColor: description === desc ? "#2196F3" : "#ddd",
                     borderRadius: "8px",
                     cursor: "pointer",
                     minHeight: "70px",
@@ -522,7 +646,55 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                     color: "#000"
                   }}
                 >
-                  {p.descripcion}
+                  {desc}
+                </button>
+              ))}
+              {activeModal === "presentacion" && availablePresentaciones.map((p) => (
+                <button
+                  key={p.codigo}
+                  onClick={() => {
+                    setProductoCodigo(p.codigo);
+                    setActiveModal(null);
+                  }}
+                  style={{
+                    padding: "1.25rem",
+                    fontSize: "1.1rem",
+                    fontWeight: "600",
+                    border: "2px solid #ddd",
+                    backgroundColor: productoCodigo === p.codigo ? "#e3f2fd" : "white",
+                    borderColor: productoCodigo === p.codigo ? "#2196F3" : "#ddd",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    minHeight: "70px",
+                    transition: "all 0.2s",
+                    color: "#000"
+                  }}
+                >
+                  {p.presentacion}
+                </button>
+              ))}
+              {activeModal === "tamano" && availableTamanos.map((t) => (
+                <button
+                  key={t.codigo}
+                  onClick={() => {
+                    setTamanoCodigo(t.codigo);
+                    setActiveModal(null);
+                  }}
+                  style={{
+                    padding: "1.25rem",
+                    fontSize: "1.1rem",
+                    fontWeight: "600",
+                    border: "2px solid #ddd",
+                    backgroundColor: tamanoCodigo === t.codigo ? "#e3f2fd" : "white",
+                    borderColor: tamanoCodigo === t.codigo ? "#2196F3" : "#ddd",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    minHeight: "70px",
+                    transition: "all 0.2s",
+                    color: "#000"
+                  }}
+                >
+                  {t.tamano}
                 </button>
               ))}
               {activeModal === "cantidad" && (
@@ -775,7 +947,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               })()}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
