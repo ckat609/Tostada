@@ -29,6 +29,7 @@ export interface EntryRow {
   cliente: string;
   descripcion: string;
   presentacion: string;
+  tamano: string;
   cantidad: number;
 }
 
@@ -61,6 +62,9 @@ export async function addEntryRow(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
+  const tamanoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "tamano"
+  );
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
@@ -88,6 +92,7 @@ export async function addEntryRow(
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
+  if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
 
   const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
@@ -109,6 +114,7 @@ export interface RecentRow {
   cliente: string;
   descripcion: string;
   presentacion: string;
+  tamano: string;
   cantidad: string;
   rowIndex: number; // 1-based row index in the sheet
 }
@@ -139,6 +145,9 @@ export async function getRecentRows(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
+  const tamanoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "tamano"
+  );
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
@@ -155,6 +164,7 @@ export async function getRecentRows(
         cliente: clienteValue,
         descripcion: descripcionIndex !== -1 ? String(row[descripcionIndex] ?? "") : "",
         presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "") : "",
+        tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "") : "",
         cantidad: cantidadIndex !== -1 ? String(row[cantidadIndex] ?? "") : "",
         rowIndex: index + 2, // +2 because: +1 for slice(1), +1 for 1-based indexing
       };
@@ -168,8 +178,20 @@ export async function getRecentRows(
 }
 
 export interface Producto {
+  codigo: string;
   descripcion: string;
-  presentaciones: string[];
+  presentacion: string; // Comma-separated list of presentacion codigos
+  tamano: string; // Comma-separated list of tamano codigos
+}
+
+export interface Presentacion {
+  codigo: string;
+  presentacion: string;
+}
+
+export interface Tamano {
+  codigo: string;
+  tamano: string;
 }
 
 export interface Ruta {
@@ -194,29 +216,82 @@ export async function getProductos(
   if (allRows.length === 0) return [];
 
   const headers = allRows[0];
+  const codigoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "codigo"
+  );
   const descripcionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "descripcion"
   );
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
-
-  if (descripcionIndex === -1) {
-    return [];
-  }
+  const tamanoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "tamano"
+  );
 
   return allRows
     .slice(1)
-    .map(row => {
-      const descripcion = String(row[descripcionIndex] ?? "").trim();
-      const presentacionValue = presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "").trim() : "";
-      const presentaciones = presentacionValue
-        ? presentacionValue.split(",").map(t => t.trim()).filter(Boolean)
-        : [];
-
-      return { descripcion, presentaciones };
-    })
+    .map(row => ({
+      codigo: codigoIndex !== -1 ? String(row[codigoIndex] ?? "").trim() : "",
+      descripcion: descripcionIndex !== -1 ? String(row[descripcionIndex] ?? "").trim() : "",
+      presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "").trim() : "",
+      tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "").trim() : ""
+    }))
     .filter(p => p.descripcion);
+}
+
+export async function getPresentaciones(
+  accessToken: string
+): Promise<Presentacion[]> {
+  const { spreadsheetId } = appConfig.sheets;
+  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent("presentaciones")}`;
+  const response = await sheetsRequest<SheetsValuesResponse>(accessToken, url);
+
+  const allRows = response.values ?? [];
+  if (allRows.length === 0) return [];
+
+  const headers = allRows[0];
+  const codigoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "codigo"
+  );
+  const presentacionIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "presentacion"
+  );
+
+  return allRows
+    .slice(1)
+    .map(row => ({
+      codigo: codigoIndex !== -1 ? String(row[codigoIndex] ?? "").trim() : "",
+      presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "").trim() : ""
+    }))
+    .filter(p => p.codigo && p.presentacion);
+}
+
+export async function getTamanos(
+  accessToken: string
+): Promise<Tamano[]> {
+  const { spreadsheetId } = appConfig.sheets;
+  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent("tamanos")}`;
+  const response = await sheetsRequest<SheetsValuesResponse>(accessToken, url);
+
+  const allRows = response.values ?? [];
+  if (allRows.length === 0) return [];
+
+  const headers = allRows[0];
+  const codigoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "codigo"
+  );
+  const tamanoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "tamano"
+  );
+
+  return allRows
+    .slice(1)
+    .map(row => ({
+      codigo: codigoIndex !== -1 ? String(row[codigoIndex] ?? "").trim() : "",
+      tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "").trim() : ""
+    }))
+    .filter(t => t.codigo && t.tamano);
 }
 
 export async function getRutas(
@@ -348,6 +423,9 @@ export async function updateRow(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
+  const tamanoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "tamano"
+  );
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
@@ -358,6 +436,7 @@ export async function updateRow(
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
+  if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
 
   const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;

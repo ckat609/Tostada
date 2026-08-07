@@ -1,10 +1,12 @@
 import { useState } from "react";
-import type { RecentRow, Ruta } from "../lib/graph";
+import type { RecentRow, Ruta, Presentacion, Tamano } from "../lib/graph";
 import { deleteRow } from "../lib/graph";
 
 interface RecentRowsProps {
   rows: RecentRow[];
   rutas: Ruta[];
+  presentaciones: Presentacion[];
+  tamanos: Tamano[];
   loading: boolean;
   error: string;
   accessToken: string;
@@ -14,7 +16,7 @@ interface RecentRowsProps {
 
 type DateFilter = "today" | "week" | "month" | "range";
 
-export function RecentRows({ rows, rutas, loading, error, accessToken, onRefresh, onEdit }: RecentRowsProps) {
+export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, error, accessToken, onRefresh, onEdit }: RecentRowsProps) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -82,17 +84,22 @@ export function RecentRows({ rows, rutas, loading, error, accessToken, onRefresh
   const generateCSV = () => {
     if (filteredRows.length === 0) return null;
 
-    const headers = ["Fecha", "Ruta", "Cliente", "Descripcion", "Presentacion", "Cantidad"];
+    const headers = ["Fecha", "Ruta", "Cliente", "Descripcion", "Presentacion", "Tamaño", "Cantidad"];
     const csvRows = [
       headers.join(","),
-      ...filteredRows.map(row => [
-        row.fecha,
-        row.ruta,
-        `"${row.cliente}"`,
-        `"${row.descripcion}"`,
-        `"${row.presentacion}"`,
-        row.cantidad
-      ].join(","))
+      ...filteredRows.map(row => {
+        const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
+        const tamano = tamanos.find(t => t.codigo === row.tamano);
+        return [
+          row.fecha,
+          row.ruta,
+          `"${row.cliente}"`,
+          `"${row.descripcion}"`,
+          `"${presentacion?.presentacion || row.presentacion}"`,
+          `"${tamano?.tamano || row.tamano}"`,
+          row.cantidad
+        ].join(",");
+      })
     ];
 
     const csvString = csvRows.join("\n");
@@ -374,16 +381,21 @@ export function RecentRows({ rows, rutas, loading, error, accessToken, onRefresh
                           <th>Cliente</th>
                           <th>Descripcion</th>
                           <th>Presentacion</th>
+                          <th>Tamaño</th>
                           <th>Cantidad</th>
                           <th style={{ width: "140px" }}>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {rutaGroup.items.map((row, index) => (
+                        {rutaGroup.items.map((row, index) => {
+                          const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
+                          const tamano = tamanos.find(t => t.codigo === row.tamano);
+                          return (
                           <tr key={`${row.descripcion}-${index}`}>
                             <td>{row.cliente}</td>
                             <td>{row.descripcion}</td>
-                            <td>{row.presentacion}</td>
+                            <td>{presentacion?.presentacion || row.presentacion}</td>
+                            <td>{tamano?.tamano || row.tamano}</td>
                             <td>{row.cantidad}</td>
                             <td>
                               <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -422,7 +434,8 @@ export function RecentRows({ rows, rutas, loading, error, accessToken, onRefresh
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

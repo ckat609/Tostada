@@ -3,7 +3,7 @@ import { useGoogleLogin, googleLogout } from "@react-oauth/google";
 import { appConfig, getConfigurationProblems } from "./config";
 import { EntryForm } from "./components/EntryForm";
 import { RecentRows } from "./components/RecentRows";
-import { getRecentRows, getRutas, type RecentRow, type Ruta } from "./lib/graph";
+import { getRecentRows, getRutas, getPresentaciones, getTamanos, type RecentRow, type Ruta, type Presentacion, type Tamano } from "./lib/graph";
 import { GOOGLE_SCOPES } from "./auth";
 
 export default function App() {
@@ -13,6 +13,8 @@ export default function App() {
   const [loadingRows, setLoadingRows] = useState(false);
   const [rowError, setRowError] = useState("");
   const [rutas, setRutas] = useState<Ruta[]>([]);
+  const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
+  const [tamanos, setTamanos] = useState<Tamano[]>([]);
   const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
   const configurationProblems = getConfigurationProblems();
 
@@ -22,9 +24,16 @@ export default function App() {
     setLoadingRows(true);
     setRowError("");
     try {
-      const [rowsData, rutasData] = await Promise.all([getRecentRows(accessToken), getRutas(accessToken)]);
+      const [rowsData, rutasData, presentacionesData, tamanosData] = await Promise.all([
+        getRecentRows(accessToken),
+        getRutas(accessToken),
+        getPresentaciones(accessToken),
+        getTamanos(accessToken)
+      ]);
       setRows(rowsData);
       setRutas(rutasData);
+      setPresentaciones(presentacionesData);
+      setTamanos(tamanosData);
     } catch (error) {
       setRowError(error instanceof Error ? error.message : "Could not load spreadsheet rows.");
     } finally {
@@ -111,7 +120,17 @@ export default function App() {
 
           <div className="grid">
             <EntryForm onSaved={refreshRows} accessToken={accessToken} editingRow={editingRow} onCancelEdit={() => setEditingRow(null)} />
-            <RecentRows rows={rows} rutas={rutas} loading={loadingRows} error={rowError} accessToken={accessToken} onRefresh={refreshRows} onEdit={setEditingRow} />
+            <RecentRows
+              rows={rows}
+              rutas={rutas}
+              presentaciones={presentaciones}
+              tamanos={tamanos}
+              loading={loadingRows}
+              error={rowError}
+              accessToken={accessToken}
+              onRefresh={refreshRows}
+              onEdit={setEditingRow}
+            />
           </div>
         </>
       )}
