@@ -307,12 +307,39 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
 
   return (
     <>
-      <form className="card form" onSubmit={handleSubmit} style={{ fontSize: "1.1rem", backgroundColor: editingRow ? "#ffe5e5" : "white", border: editingRow ? "3px solid #dc3545" : undefined }}>
-        <div>
-          <p className="eyebrow" style={{ color: editingRow ? "#dc3545" : undefined }}>
-            {editingRow ? "Editando entrada" : "Nueva entrada"}
-          </p>
-          <h2>{editingRow ? "Editar venta" : "Agregar venta"}</h2>
+      <form className="card form" onSubmit={handleSubmit} style={{ fontSize: "1.1rem", backgroundColor: editingRow ? "#fff9e6" : "white", border: editingRow ? "3px solid #f0ad4e" : undefined }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <p className="eyebrow" style={{ color: editingRow ? "#f0ad4e" : undefined }}>
+              {editingRow ? "Editando entrada" : "Nueva entrada"}
+            </p>
+            <h2>{editingRow ? "Editar venta" : "Agregar venta"}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDate(new Date().toISOString().slice(0, 10));
+              setRuta("");
+              setCliente("");
+              setDescription("");
+              setProductoCodigo("");
+              setTamanoCodigo("");
+              setAmount("");
+              setStatus("");
+            }}
+            style={{
+              padding: "0.5rem 1rem",
+              fontSize: "0.9rem",
+              backgroundColor: "#6c757d",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "600"
+            }}
+          >
+            Limpiar
+          </button>
         </div>
 
         <button
@@ -325,10 +352,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             minHeight: "56px",
             borderRadius: "8px",
             border: "2px solid #ddd",
-            backgroundColor: "white",
+            backgroundColor: date ? "#2196F3" : "#888",
             cursor: "pointer",
             textAlign: "left",
-            color: "#000",
+            color: "white",
             textTransform: "capitalize"
           }}
         >
@@ -348,10 +375,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                 minHeight: "56px",
                 borderRadius: "8px",
                 border: "2px solid #ddd",
-                backgroundColor: "white",
+                backgroundColor: ruta ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
-                color: ruta ? "#000" : "#666"
+                color: "white"
               }}
             >
               {loadingRutas ? "Cargando..." : ruta || "Ruta"}
@@ -371,10 +398,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                 minHeight: "56px",
                 borderRadius: "8px",
                 border: "2px solid #ddd",
-                backgroundColor: "white",
+                backgroundColor: cliente ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
-                color: cliente ? "#000" : "#666"
+                color: "white"
               }}
             >
               {!ruta ? "Selecciona ruta" : loadingClientes ? "Cargando..." : cliente || "Cliente"}
@@ -395,10 +422,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               minHeight: "56px",
               borderRadius: "8px",
               border: "2px solid #ddd",
-              backgroundColor: "white",
+              backgroundColor: description ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: description ? "#000" : "#666"
+              color: "white"
             }}
           >
             {loadingProductos ? "Cargando..." : description || "Producto"}
@@ -418,10 +445,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               minHeight: "56px",
               borderRadius: "8px",
               border: "2px solid #ddd",
-              backgroundColor: "white",
+              backgroundColor: selectedPresentacion ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: selectedPresentacion ? "#000" : "#666"
+              color: "white"
             }}
           >
             {!description ? "Selecciona producto" : selectedPresentacion?.presentacion || "Presentación"}
@@ -438,10 +465,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               minHeight: "56px",
               borderRadius: "8px",
               border: "2px solid #ddd",
-              backgroundColor: "white",
+              backgroundColor: selectedTamano ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: selectedTamano ? "#000" : "#666"
+              color: "white"
             }}
           >
             {!description ? "Selecciona producto" : selectedTamano?.tamano || "Tamaño"}
@@ -459,10 +486,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               minHeight: "56px",
               borderRadius: "8px",
               border: "2px solid #ddd",
-              backgroundColor: "white",
+              backgroundColor: amount ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: amount ? "#000" : "#666"
+              color: "white"
             }}
           >
             {amount || "Cantidad"}
@@ -499,7 +526,11 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               fontSize: "1.25rem",
               fontWeight: "700",
               minHeight: "64px",
-              borderRadius: "8px"
+              borderRadius: "8px",
+              backgroundColor: "#28a745",
+              color: "white",
+              border: "none",
+              cursor: "pointer"
             }}
           >
             {saving ? (editingRow ? "Actualizando…" : "Guardando…") : (editingRow ? "Actualizar" : "Guardar")}
@@ -571,9 +602,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             <div style={{
               padding: "1rem",
               overflowY: "auto",
-              display: activeModal === "cantidad" || activeModal === "fecha" ? "flex" : "grid",
+              display: "flex",
               flexDirection: "column",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
               gap: "0.75rem"
             }}>
               {activeModal === "ruta" && [...rutas].sort((a, b) => a.ruta.localeCompare(b.ruta)).map((r) => (

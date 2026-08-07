@@ -31,6 +31,7 @@ export interface EntryRow {
   presentacion: string;
   tamano: string;
   cantidad: number;
+  estado?: string;
 }
 
 export async function addEntryRow(
@@ -68,6 +69,9 @@ export async function addEntryRow(
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
 
   // Find the highest codigo value
   let nextCodigo = 1;
@@ -94,6 +98,7 @@ export async function addEntryRow(
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
+  if (estadoIndex !== -1) row[estadoIndex] = entry.estado || ""; // Set estado if provided, otherwise empty
 
   const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
   await sheetsRequest(accessToken, appendUrl, {
@@ -116,6 +121,7 @@ export interface RecentRow {
   presentacion: string;
   tamano: string;
   cantidad: string;
+  estado: string;
   rowIndex: number; // 1-based row index in the sheet
 }
 
@@ -151,6 +157,9 @@ export async function getRecentRows(
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
 
   const dataRows = allRows.slice(1);
   const mappedRows = dataRows
@@ -166,9 +175,11 @@ export async function getRecentRows(
         presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "") : "",
         tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "") : "",
         cantidad: cantidadIndex !== -1 ? String(row[cantidadIndex] ?? "") : "",
+        estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "") : "",
         rowIndex: index + 2, // +2 because: +1 for slice(1), +1 for 1-based indexing
       };
-    });
+    })
+    .filter(row => row.estado.toLowerCase() !== "deleted"); // Filter out deleted rows
 
   // Sort by fecha (desc), then ruta
   return mappedRows.sort((a, b) => {
@@ -366,35 +377,28 @@ export async function deleteRow(
 ): Promise<void> {
   const { spreadsheetId, sheetName } = appConfig.sheets;
 
-  // Get sheet ID first
-  const metaUrl = `${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets(properties(sheetId,title))`;
-  const metaResponse = await sheetsRequest<{ sheets: Array<{ properties: { sheetId: number; title: string } }> }>(
-    accessToken,
-    metaUrl
+  // Get headers to find estado column
+  const getUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
+  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, getUrl);
+  const headers = headerResponse.values?.[0] ?? [];
+
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
   );
 
-  const sheet = metaResponse.sheets.find(s => s.properties.title.toLowerCase() === sheetName.toLowerCase());
-  if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
+  if (estadoIndex === -1) {
+    throw new Error("Column 'estado' not found in the sheet");
+  }
 
-  const sheetId = sheet.properties.sheetId;
+  // Get the column letter for estado
+  const columnLetter = String.fromCharCode(65 + estadoIndex); // A=65, B=66, etc.
 
-  // Delete the row
-  const batchUrl = `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`;
-  await sheetsRequest(accessToken, batchUrl, {
-    method: "POST",
+  // Update the estado cell to "deleted"
+  const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!${columnLetter}${rowIndex}?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, updateUrl, {
+    method: "PUT",
     body: JSON.stringify({
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId,
-              dimension: "ROWS",
-              startIndex: rowIndex - 1, // 0-based for API
-              endIndex: rowIndex // exclusive
-            }
-          }
-        }
-      ]
+      values: [["deleted"]]
     })
   });
 }
@@ -429,6 +433,9 @@ export async function updateRow(
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
 
   // Build row array matching the actual column order
   const row = new Array(headers.length).fill("");
@@ -438,6 +445,7 @@ export async function updateRow(
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
+  if (estadoIndex !== -1) row[estadoIndex] = entry.estado || ""; // Preserve estado when updating
 
   const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
   await sheetsRequest(accessToken, updateUrl, {
