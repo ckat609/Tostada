@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RecentRow, Ruta, Presentacion, Tamano } from "../lib/graph";
+import type { RecentRow, Ruta, Presentacion, Tamano, Producto } from "../lib/graph";
 import { deleteRow } from "../lib/graph";
 
 interface RecentRowsProps {
@@ -7,6 +7,7 @@ interface RecentRowsProps {
   rutas: Ruta[];
   presentaciones: Presentacion[];
   tamanos: Tamano[];
+  productos: Producto[];
   loading: boolean;
   error: string;
   accessToken: string;
@@ -17,7 +18,7 @@ interface RecentRowsProps {
 
 type DateFilter = "today" | "week" | "month" | "range";
 
-export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
+export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -32,27 +33,30 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
     return rows.filter(row => {
       if (!row.fecha) return false;
 
+      // Extract date part from timestamp (YYYY-MM-DD)
+      const rowDateOnly = row.fecha.split(' ')[0];
+
       switch (dateFilter) {
         case "today":
-          return row.fecha === todayStr;
+          return rowDateOnly === todayStr;
 
         case "week":
           const weekAgo = new Date(now);
           weekAgo.setDate(now.getDate() - 7);
           const weekAgoStr = weekAgo.toISOString().slice(0, 10);
-          return row.fecha >= weekAgoStr;
+          return rowDateOnly >= weekAgoStr;
 
         case "month":
           const monthAgo = new Date(now);
           monthAgo.setMonth(now.getMonth() - 1);
           const monthAgoStr = monthAgo.toISOString().slice(0, 10);
-          return row.fecha >= monthAgoStr;
+          return rowDateOnly >= monthAgoStr;
 
         case "range":
           if (!startDate && !endDate) return true;
           const start = startDate || "0000-01-01";
           const end = endDate || "9999-12-31";
-          return row.fecha >= start && row.fecha <= end;
+          return rowDateOnly >= start && rowDateOnly <= end;
 
         default:
           return true;
@@ -89,13 +93,25 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
     const csvRows = [
       headers.join(","),
       ...filteredRows.map(row => {
+        // Convert UTC timestamp to Mexico Central Time (UTC-6) for CSV
+        let mexicoTimestamp = row.fecha;
+        if (row.fecha.includes(' ')) {
+          const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z');
+          const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000));
+          mexicoTimestamp = mexicoTime.toISOString().replace('T', ' ').substring(0, 19);
+        }
+
+        // Look up human-readable values
+        const rutaData = rutas.find(r => r.codigo === row.ruta);
+        const productoData = productos.find(p => p.codigo === row.descripcion);
         const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
         const tamano = tamanos.find(t => t.codigo === row.tamano);
+
         return [
-          row.fecha,
-          row.ruta,
+          mexicoTimestamp,
+          `"${rutaData?.ruta || row.ruta}"`,
           `"${row.cliente}"`,
-          `"${row.descripcion}"`,
+          `"${productoData?.descripcion || row.descripcion}"`,
           `"${presentacion?.presentacion || row.presentacion}"`,
           `"${tamano?.tamano || row.tamano}"`,
           row.cantidad
@@ -147,13 +163,16 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
     URL.revokeObjectURL(url);
   };
 
-  // Group rows by fecha, then by ruta
+  // Group rows by fecha (date only, without time), then by ruta
   const groupedByFecha: { fecha: string; rutas: { ruta: string; items: RecentRow[] }[] }[] = [];
 
   filteredRows.forEach((row) => {
-    let fechaGroup = groupedByFecha.find(g => g.fecha === row.fecha);
+    // Extract just the date part (YYYY-MM-DD) from timestamp
+    const dateOnly = row.fecha.split(' ')[0];
+
+    let fechaGroup = groupedByFecha.find(g => g.fecha === dateOnly);
     if (!fechaGroup) {
-      fechaGroup = { fecha: row.fecha, rutas: [] };
+      fechaGroup = { fecha: dateOnly, rutas: [] };
       groupedByFecha.push(fechaGroup);
     }
 
@@ -380,6 +399,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                     <table>
                       <thead>
                         <tr>
+                          <th>Hora</th>
                           <th>Cliente</th>
                           <th>Descripcion</th>
                           <th>Presentacion</th>
@@ -392,14 +412,23 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                         {rutaGroup.items.map((row, index) => {
                           const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
                           const tamano = tamanos.find(t => t.codigo === row.tamano);
+                          const producto = productos.find(p => p.codigo === row.descripcion);
                           const isEditing = editingRow?.rowIndex === row.rowIndex;
+                          // Convert UTC timestamp to Mexico Central Time (UTC-6)
+                          let timeOnly = '';
+                          if (row.fecha.includes(' ')) {
+                            const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z'); // Parse as UTC
+                            const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000)); // Subtract 6 hours
+                            timeOnly = mexicoTime.toISOString().substring(11, 16); // Extract HH:MM
+                          }
                           return (
                           <tr key={`${row.descripcion}-${index}`} style={{
                             backgroundColor: isEditing ? "#fff9e6" : "transparent",
                             border: isEditing ? "2px solid #f0ad4e" : "none"
                           }}>
+                            <td>{timeOnly}</td>
                             <td>{row.cliente}</td>
-                            <td>{row.descripcion}</td>
+                            <td>{producto?.descripcion || row.descripcion}</td>
                             <td>{presentacion?.presentacion || row.presentacion}</td>
                             <td>{tamano?.tamano || row.tamano}</td>
                             <td>{row.cantidad}</td>
@@ -451,7 +480,15 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                     {rutaGroup.items.map((row, index) => {
                       const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
                       const tamano = tamanos.find(t => t.codigo === row.tamano);
+                      const producto = productos.find(p => p.codigo === row.descripcion);
                       const isEditing = editingRow?.rowIndex === row.rowIndex;
+                      // Convert UTC timestamp to Mexico Central Time (UTC-6)
+                      let timeOnly = '';
+                      if (row.fecha.includes(' ')) {
+                        const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z'); // Parse as UTC
+                        const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000)); // Subtract 6 hours
+                        timeOnly = mexicoTime.toISOString().substring(11, 16); // Extract HH:MM
+                      }
                       return (
                         <div
                           key={`${row.descripcion}-${index}`}
@@ -463,11 +500,16 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                             marginBottom: "0.75rem"
                           }}
                         >
-                          <div style={{ fontWeight: "700", fontSize: "1.1rem", marginBottom: "0.5rem", color: "#333" }}>
-                            {row.cliente}
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                            <div style={{ fontWeight: "700", fontSize: "1.1rem", color: "#333" }}>
+                              {row.cliente}
+                            </div>
+                            <div style={{ fontSize: "0.9rem", color: "#666" }}>
+                              {timeOnly}
+                            </div>
                           </div>
                           <div style={{ display: "grid", gap: "0.25rem", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
-                            <div><span style={{ color: "#666" }}>Descripcion:</span> {row.descripcion}</div>
+                            <div><span style={{ color: "#666" }}>Descripcion:</span> {producto?.descripcion || row.descripcion}</div>
                             <div><span style={{ color: "#666" }}>Presentacion:</span> {presentacion?.presentacion || row.presentacion}</div>
                             <div><span style={{ color: "#666" }}>Tamaño:</span> {tamano?.tamano || row.tamano}</div>
                             <div><span style={{ color: "#666" }}>Cantidad:</span> {row.cantidad}</div>

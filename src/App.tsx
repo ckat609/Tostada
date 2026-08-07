@@ -3,7 +3,7 @@ import { useGoogleLogin, googleLogout } from "@react-oauth/google";
 import { appConfig, getConfigurationProblems } from "./config";
 import { EntryForm } from "./components/EntryForm";
 import { RecentRows } from "./components/RecentRows";
-import { getRecentRows, getRutas, getPresentaciones, getTamanos, type RecentRow, type Ruta, type Presentacion, type Tamano } from "./lib/graph";
+import { getRecentRows, getRutas, getPresentaciones, getTamanos, getProductos, type RecentRow, type Ruta, type Presentacion, type Tamano, type Producto } from "./lib/graph";
 import { GOOGLE_SCOPES } from "./auth";
 
 export default function App() {
@@ -15,6 +15,7 @@ export default function App() {
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [tamanos, setTamanos] = useState<Tamano[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
   const configurationProblems = getConfigurationProblems();
 
@@ -29,16 +30,18 @@ export default function App() {
     setLoadingRows(true);
     setRowError("");
     try {
-      const [rowsData, rutasData, presentacionesData, tamanosData] = await Promise.all([
+      const [rowsData, rutasData, presentacionesData, tamanosData, productosData] = await Promise.all([
         getRecentRows(accessToken),
         getRutas(accessToken),
         getPresentaciones(accessToken),
-        getTamanos(accessToken)
+        getTamanos(accessToken),
+        getProductos(accessToken)
       ]);
       setRows(rowsData);
       setRutas(rutasData);
       setPresentaciones(presentacionesData);
       setTamanos(tamanosData);
+      setProductos(productosData);
     } catch (error) {
       setRowError(error instanceof Error ? error.message : "Could not load spreadsheet rows.");
     } finally {
@@ -130,6 +133,7 @@ export default function App() {
               rutas={rutas}
               presentaciones={presentaciones}
               tamanos={tamanos}
+              productos={productos}
               loading={loadingRows}
               error={rowError}
               accessToken={accessToken}
