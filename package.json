@@ -1,5 +1,5 @@
 {
-  "name": "office-excel-pwa",
+  "name": "google-sheets-pwa",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,8 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@azure/msal-browser": "^5.18.0",
-    "@azure/msal-react": "^5.5.4",
+    "@react-oauth/google": "^0.12.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
