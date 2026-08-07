@@ -18,6 +18,11 @@ export default function App() {
   const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
   const configurationProblems = getConfigurationProblems();
 
+  const handleEdit = (row: RecentRow) => {
+    setEditingRow(row);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const refreshRows = useCallback(async () => {
     if (!accessToken || configurationProblems.length > 0) return;
 
@@ -129,7 +134,8 @@ export default function App() {
               error={rowError}
               accessToken={accessToken}
               onRefresh={refreshRows}
-              onEdit={setEditingRow}
+              onEdit={handleEdit}
+              editingRow={editingRow}
             />
           </div>
         </>

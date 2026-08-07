@@ -12,11 +12,12 @@ interface RecentRowsProps {
   accessToken: string;
   onRefresh: () => void;
   onEdit: (row: RecentRow) => void;
+  editingRow: RecentRow | null;
 }
 
 type DateFilter = "today" | "week" | "month" | "range";
 
-export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, error, accessToken, onRefresh, onEdit }: RecentRowsProps) {
+export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -360,7 +361,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                   {formatFecha(fechaGroup.fecha)}
                 </div>
               {fechaGroup.rutas.map((rutaGroup, rutaIndex) => (
-                <div key={`ruta-${rutaGroup.ruta}-${rutaIndex}`} style={{ marginBottom: "2rem", marginLeft: "2rem" }}>
+                <div key={`ruta-${rutaGroup.ruta}-${rutaIndex}`} className="ruta-group">
                   {rutaGroup.ruta && (
                     <div style={{
                       padding: "0.6rem 1rem",
@@ -374,7 +375,8 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                       {rutas.find(r => r.codigo === rutaGroup.ruta)?.ruta || rutaGroup.ruta}
                     </div>
                   )}
-                  <div className="table-wrap">
+                  {/* Desktop: Table view */}
+                  <div className="table-wrap desktop-only">
                     <table>
                       <thead>
                         <tr>
@@ -390,8 +392,12 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                         {rutaGroup.items.map((row, index) => {
                           const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
                           const tamano = tamanos.find(t => t.codigo === row.tamano);
+                          const isEditing = editingRow?.rowIndex === row.rowIndex;
                           return (
-                          <tr key={`${row.descripcion}-${index}`}>
+                          <tr key={`${row.descripcion}-${index}`} style={{
+                            backgroundColor: isEditing ? "#fff9e6" : "transparent",
+                            border: isEditing ? "2px solid #f0ad4e" : "none"
+                          }}>
                             <td>{row.cliente}</td>
                             <td>{row.descripcion}</td>
                             <td>{presentacion?.presentacion || row.presentacion}</td>
@@ -438,6 +444,71 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, loading, erro
                         })}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Mobile: Card view */}
+                  <div className="mobile-only">
+                    {rutaGroup.items.map((row, index) => {
+                      const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
+                      const tamano = tamanos.find(t => t.codigo === row.tamano);
+                      const isEditing = editingRow?.rowIndex === row.rowIndex;
+                      return (
+                        <div
+                          key={`${row.descripcion}-${index}`}
+                          style={{
+                            backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
+                            border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
+                            borderRadius: "8px",
+                            padding: "1rem",
+                            marginBottom: "0.75rem"
+                          }}
+                        >
+                          <div style={{ fontWeight: "700", fontSize: "1.1rem", marginBottom: "0.5rem", color: "#333" }}>
+                            {row.cliente}
+                          </div>
+                          <div style={{ display: "grid", gap: "0.25rem", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
+                            <div><span style={{ color: "#666" }}>Descripcion:</span> {row.descripcion}</div>
+                            <div><span style={{ color: "#666" }}>Presentacion:</span> {presentacion?.presentacion || row.presentacion}</div>
+                            <div><span style={{ color: "#666" }}>Tamaño:</span> {tamano?.tamano || row.tamano}</div>
+                            <div><span style={{ color: "#666" }}>Cantidad:</span> {row.cantidad}</div>
+                          </div>
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <button
+                              onClick={() => onEdit(row)}
+                              style={{
+                                flex: 1,
+                                padding: "0.75rem",
+                                fontSize: "1rem",
+                                backgroundColor: "#2196F3",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontWeight: "600"
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDelete(row)}
+                              style={{
+                                flex: 1,
+                                padding: "0.75rem",
+                                fontSize: "1rem",
+                                backgroundColor: "#dc3545",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontWeight: "600"
+                              }}
+                            >
+                              Borrar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
