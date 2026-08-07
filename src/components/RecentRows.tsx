@@ -89,16 +89,21 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
   const generateCSV = () => {
     if (filteredRows.length === 0) return null;
 
-    const headers = ["Fecha", "Ruta", "Cliente", "Descripcion", "Presentacion", "Tamaño", "Cantidad"];
+    const headers = ["Fecha", "Hora", "Ruta", "Cliente", "Descripcion", "Presentacion", "Tamaño", "Cantidad"];
     const csvRows = [
       headers.join(","),
       ...filteredRows.map(row => {
         // Convert UTC timestamp to Mexico Central Time (UTC-6) for CSV
-        let mexicoTimestamp = row.fecha;
+        let dateOnly = '';
+        let timeOnly = '';
         if (row.fecha.includes(' ')) {
           const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z');
           const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000));
-          mexicoTimestamp = mexicoTime.toISOString().replace('T', ' ').substring(0, 19);
+          const mexicoTimestamp = mexicoTime.toISOString();
+          dateOnly = mexicoTimestamp.substring(0, 10); // YYYY-MM-DD
+          timeOnly = mexicoTimestamp.substring(11, 19); // HH:MM:SS
+        } else {
+          dateOnly = row.fecha;
         }
 
         // Look up human-readable values
@@ -108,7 +113,8 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
         const tamano = tamanos.find(t => t.codigo === row.tamano);
 
         return [
-          mexicoTimestamp,
+          dateOnly,
+          timeOnly,
           `"${rutaData?.ruta || row.ruta}"`,
           `"${row.cliente}"`,
           `"${productoData?.descripcion || row.descripcion}"`,
