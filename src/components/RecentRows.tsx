@@ -18,6 +18,16 @@ interface RecentRowsProps {
 
 type DateFilter = "today" | "week" | "month" | "range";
 
+// Convert a "YYYY-MM-DD HH:MM:SS" UTC timestamp to Mexico Central Time (UTC-6).
+// Returns null if the timestamp isn't in the expected format (e.g. a row edited
+// manually in Google Sheets, which can store dates in a locale-specific format).
+function toMexicoTime(fecha: string): Date | null {
+  if (!fecha.includes(" ")) return null;
+  const utcDate = new Date(fecha.replace(" ", "T") + "Z");
+  if (isNaN(utcDate.getTime())) return null;
+  return new Date(utcDate.getTime() - 6 * 60 * 60 * 1000);
+}
+
 export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [startDate, setStartDate] = useState("");
@@ -96,9 +106,8 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
         // Convert UTC timestamp to Mexico Central Time (UTC-6) for CSV
         let dateOnly = '';
         let timeOnly = '';
-        if (row.fecha.includes(' ')) {
-          const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z');
-          const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000));
+        const mexicoTime = toMexicoTime(row.fecha);
+        if (mexicoTime) {
           const mexicoTimestamp = mexicoTime.toISOString();
           dateOnly = mexicoTimestamp.substring(0, 10); // YYYY-MM-DD
           timeOnly = mexicoTimestamp.substring(11, 19); // HH:MM:SS
@@ -421,12 +430,8 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                           const producto = productos.find(p => p.codigo === row.descripcion);
                           const isEditing = editingRow?.rowIndex === row.rowIndex;
                           // Convert UTC timestamp to Mexico Central Time (UTC-6)
-                          let timeOnly = '';
-                          if (row.fecha.includes(' ')) {
-                            const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z'); // Parse as UTC
-                            const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000)); // Subtract 6 hours
-                            timeOnly = mexicoTime.toISOString().substring(11, 16); // Extract HH:MM
-                          }
+                          const mexicoTime = toMexicoTime(row.fecha);
+                          const timeOnly = mexicoTime ? mexicoTime.toISOString().substring(11, 16) : '';
                           return (
                           <tr key={`${row.descripcion}-${index}`} style={{
                             backgroundColor: isEditing ? "#fff9e6" : "transparent",
@@ -489,12 +494,8 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                       const producto = productos.find(p => p.codigo === row.descripcion);
                       const isEditing = editingRow?.rowIndex === row.rowIndex;
                       // Convert UTC timestamp to Mexico Central Time (UTC-6)
-                      let timeOnly = '';
-                      if (row.fecha.includes(' ')) {
-                        const utcDate = new Date(row.fecha.replace(' ', 'T') + 'Z'); // Parse as UTC
-                        const mexicoTime = new Date(utcDate.getTime() - (6 * 60 * 60 * 1000)); // Subtract 6 hours
-                        timeOnly = mexicoTime.toISOString().substring(11, 16); // Extract HH:MM
-                      }
+                      const mexicoTime = toMexicoTime(row.fecha);
+                      const timeOnly = mexicoTime ? mexicoTime.toISOString().substring(11, 16) : '';
                       return (
                         <div
                           key={`${row.descripcion}-${index}`}
