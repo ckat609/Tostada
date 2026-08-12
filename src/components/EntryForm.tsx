@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { addEntryRow, updateRow, getProductos, getPresentaciones, getTamanos, getRutas, getClientes, type Producto, type Presentacion, type Tamano, type Ruta, type Cliente, type RecentRow } from "../lib/graph";
+import { addEntryRow, updateRow, getProductos, getPresentaciones, getSabores, getRutas, getClientes, getCategorias, type Producto, type Presentacion, type Sabor, type Ruta, type Cliente, type RecentRow, type Categoria } from "../lib/graph";
 
 interface EntryFormProps {
   onSaved: () => void | Promise<void>;
@@ -9,7 +9,7 @@ interface EntryFormProps {
   onCancelEdit: () => void;
 }
 
-type ModalType = "ruta" | "cliente" | "producto" | "presentacion" | "tamano" | "cantidad" | "fecha" | null;
+type ModalType = "ruta" | "cliente" | "categoria" | "producto" | "presentacion" | "sabor" | null;
 
 export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: EntryFormProps) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -17,7 +17,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [cliente, setCliente] = useState("");
   const [description, setDescription] = useState("");
   const [productoCorrelativo, setProductoCorrelativo] = useState(""); // Store the presentacion correlativo
-  const [tamanoCorrelativo, setTamanoCorrelativo] = useState(""); // Store the tamano correlativo
+  const [saborCorrelativo, setSaborCorrelativo] = useState(""); // Store the sabor correlativo
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -26,14 +26,17 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [productosError, setProductosError] = useState<string>("");
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [loadingPresentaciones, setLoadingPresentaciones] = useState(false);
-  const [tamanos, setTamanos] = useState<Tamano[]>([]);
-  const [loadingTamanos, setLoadingTamanos] = useState(false);
+  const [sabores, setSabores] = useState<Sabor[]>([]);
+  const [loadingSabores, setLoadingSabores] = useState(false);
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [loadingRutas, setLoadingRutas] = useState(false);
   const [rutasError, setRutasError] = useState<string>("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [clientesError, setClientesError] = useState<string>("");
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
+  const [categoriaFilter, setCategoriaFilter] = useState(""); // Filter only, not saved
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   // Prevent body scroll when modal is open
@@ -43,58 +46,55 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       const originalHtmlOverflow = document.documentElement.style.overflow;
       const originalBodyPosition = document.body.style.position;
 
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
 
       return () => {
         document.body.style.overflow = originalBodyOverflow;
         document.documentElement.style.overflow = originalHtmlOverflow;
         document.body.style.position = originalBodyPosition;
-        document.body.style.width = '';
+        document.body.style.width = "";
       };
     }
   }, [activeModal]);
 
-  // Calendar state
-  const currentDate = new Date(date);
-  const [viewYear, setViewYear] = useState(currentDate.getFullYear());
-  const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
+  const selectedRuta = rutas.find((r) => r.ruta === ruta);
+  const filteredClientes = selectedRuta ? clientes.filter((c) => c.ruta === selectedRuta.correlativo) : [];
 
-  const selectedRuta = rutas.find(r => r.ruta === ruta);
-  const filteredClientes = selectedRuta ? clientes.filter(c => c.ruta === selectedRuta.correlativo) : [];
-
-  // Get unique descripciones
-  const uniqueDescripciones = [...new Set(productos.map(p => p.descripcion))].sort();
+  // Get unique descripciones filtered by categoria
+  const filteredProductos = categoriaFilter ? productos.filter((p) => p.categoria === categoriaFilter) : productos;
+  const uniqueDescripciones = [...new Set(filteredProductos.map((p) => p.descripcion))].sort();
 
   // Get productos that match the selected description
-  const productosForDescription = productos.filter(p => p.descripcion === description);
+  const productosForDescription = productos.filter((p) => p.descripcion === description);
 
   // Get available presentaciones for selected producto
   const selectedProductoData = productosForDescription[0]; // All productos with same descripcion share presentaciones
   const availablePresentaciones = selectedProductoData
-    ? selectedProductoData.presentacion
-        .split(',')
-        .map(correlativo => correlativo.trim())
-        .map(correlativo => presentaciones.find(p => p.correlativo === correlativo))
+    ? selectedProductoData.presentaciones
+        .split(",")
+        .map((correlativo) => correlativo.trim())
+        .map((correlativo) => presentaciones.find((p) => p.correlativo === correlativo))
         .filter((p): p is Presentacion => p !== undefined)
     : [];
 
   // Get selected presentacion by correlativo
-  const selectedPresentacion = presentaciones.find(p => p.correlativo === productoCorrelativo);
+  const selectedPresentacion = presentaciones.find((p) => p.correlativo === productoCorrelativo);
 
-  // Get available tamanos for selected producto
-  const availableTamanos = selectedProductoData
-    ? selectedProductoData.tamano
-        .split(',')
-        .map(correlativo => correlativo.trim())
-        .map(correlativo => tamanos.find(t => t.correlativo === correlativo))
-        .filter((t): t is Tamano => t !== undefined)
+  // Get available sabores for selected producto
+  const availableSabores = selectedProductoData
+    ? selectedProductoData.sabores
+        .split(",")
+        .map((correlativo) => correlativo.trim())
+        .filter((c) => c) // Filter out empty strings
+        .map((correlativo) => sabores.find((s) => s.correlativo === correlativo))
+        .filter((s): s is Sabor => s !== undefined)
     : [];
 
-  // Get selected tamano by correlativo
-  const selectedTamano = tamanos.find(t => t.correlativo === tamanoCorrelativo);
+  // Get selected sabor by correlativo
+  const selectedSabor = sabores.find((s) => s.correlativo === saborCorrelativo);
 
   useEffect(() => {
     async function fetchProductos() {
@@ -139,21 +139,39 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   }, [accessToken]);
 
   useEffect(() => {
-    async function fetchTamanos() {
+    async function fetchSabores() {
       if (!accessToken) return;
 
-      setLoadingTamanos(true);
+      setLoadingSabores(true);
       try {
-        const tams = await getTamanos(accessToken);
-        setTamanos(tams);
+        const sabs = await getSabores(accessToken);
+        setSabores(sabs);
       } catch (error) {
-        console.error("Could not load tamanos:", error);
+        console.error("Could not load sabores:", error);
       } finally {
-        setLoadingTamanos(false);
+        setLoadingSabores(false);
       }
     }
 
-    void fetchTamanos();
+    void fetchSabores();
+  }, [accessToken]);
+
+  useEffect(() => {
+    async function fetchCategorias() {
+      if (!accessToken) return;
+
+      setLoadingCategorias(true);
+      try {
+        const cats = await getCategorias(accessToken);
+        setCategorias(cats);
+      } catch (error) {
+        console.error("Could not load categorias:", error);
+      } finally {
+        setLoadingCategorias(false);
+      }
+    }
+
+    void fetchCategorias();
   }, [accessToken]);
 
   useEffect(() => {
@@ -206,22 +224,22 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
 
   // Load editing row data
   useEffect(() => {
-    if (editingRow && productos.length > 0 && rutas.length > 0 && presentaciones.length > 0 && tamanos.length > 0) {
+    if (editingRow && productos.length > 0 && rutas.length > 0 && presentaciones.length > 0 && sabores.length > 0) {
       // Find ruta name from correlativo
-      const rutaData = rutas.find(r => r.correlativo === editingRow.ruta);
+      const rutaData = rutas.find((r) => r.correlativo === editingRow.ruta);
 
       // Find producto name from correlativo
-      const productoData = productos.find(p => p.correlativo === editingRow.descripcion);
+      const productoData = productos.find((p) => p.correlativo === editingRow.descripcion);
 
       setDate(editingRow.fecha);
       setRuta(rutaData?.ruta || "");
       setCliente(editingRow.cliente);
       setDescription(productoData?.descripcion || "");
       setProductoCorrelativo(editingRow.presentacion);
-      setTamanoCorrelativo(editingRow.tamano);
+      setSaborCorrelativo(editingRow.sabor);
       setAmount(editingRow.cantidad);
     }
-  }, [editingRow, productos, rutas, presentaciones, tamanos]);
+  }, [editingRow, productos, rutas, presentaciones, sabores]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -232,20 +250,20 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
 
     const parsedAmount = Number(amount);
-    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !tamanoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setStatus("Por favor completa todos los campos requeridos.");
       return;
     }
 
     // Find cliente correlativo from cliente name
-    const clienteData = clientes.find(c => c.cliente === cliente);
+    const clienteData = clientes.find((c) => c.cliente === cliente);
     if (!clienteData) {
       setStatus("Cliente no encontrado.");
       return;
     }
 
     // Find producto correlativo from descripcion
-    const productoData = productos.find(p => p.descripcion === description);
+    const productoData = productos.find((p) => p.descripcion === description);
     if (!productoData) {
       setStatus("Producto no encontrado.");
       return;
@@ -255,7 +273,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     setStatus("");
 
     // Generate timestamp in UTC
-    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19); // Format: "2026-08-07 14:30:45" in UTC
+    const timestamp = new Date().toISOString().replace("T", " ").substring(0, 19); // Format: "2026-08-07 14:30:45" in UTC
 
     try {
       if (editingRow) {
@@ -265,8 +283,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           cliente: clienteData.correlativo, // Store cliente correlativo
           descripcion: productoData.correlativo, // Store producto correlativo
           presentacion: productoCorrelativo, // Store presentacion correlativo
-          tamano: tamanoCorrelativo, // Store tamano correlativo
-          cantidad: parsedAmount
+          sabor: saborCorrelativo, // Store sabor correlativo
+          cantidad: parsedAmount,
         });
         setStatus("Actualizado exitosamente.");
         onCancelEdit();
@@ -276,7 +294,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         setCliente("");
         setDescription("");
         setProductoCorrelativo("");
-        setTamanoCorrelativo("");
+        setSaborCorrelativo("");
         setAmount("");
       } else {
         // Add new row - use timestamp for new entries
@@ -285,8 +303,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           cliente: clienteData.correlativo, // Store cliente correlativo
           descripcion: productoData.correlativo, // Store producto correlativo
           presentacion: productoCorrelativo, // Store presentacion correlativo
-          tamano: tamanoCorrelativo, // Store tamano correlativo
-          cantidad: parsedAmount
+          sabor: saborCorrelativo, // Store sabor correlativo
+          cantidad: parsedAmount,
         });
         setAmount("");
         setStatus("Guardado exitosamente.");
@@ -307,7 +325,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     setCliente("");
     setDescription("");
     setProductoCorrelativo("");
-    setTamanoCorrelativo("");
+    setSaborCorrelativo("");
     setAmount("");
     setStatus("");
   }
@@ -330,7 +348,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               setCliente("");
               setDescription("");
               setProductoCorrelativo("");
-              setTamanoCorrelativo("");
+              setSaborCorrelativo("");
               setAmount("");
               setStatus("");
             }}
@@ -342,34 +360,49 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               border: "none",
               borderRadius: "6px",
               cursor: "pointer",
-              fontWeight: "600"
             }}
           >
             Limpiar
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveModal("fecha")}
-          style={{
-            width: "100%",
-            padding: "1rem",
-            fontSize: "1.1rem",
-            minHeight: "56px",
-            borderRadius: "8px",
-            border: "2px solid #ddd",
-            backgroundColor: date ? "#2196F3" : "#888",
-            cursor: "pointer",
-            textAlign: "left",
-            color: "white",
-            textTransform: "capitalize"
-          }}
-        >
-          {new Date(date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </button>
+        <div style={{ position: "relative", width: "100%" }}>
+          <div
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "1.1rem",
+              minHeight: "56px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: date ? "#2196F3" : "#888",
+              color: "white",
+              textAlign: "left",
+              textTransform: "capitalize",
+              display: "flex",
+              alignItems: "center",
+              pointerEvents: "none",
+            }}
+          >
+            {new Date(date + "T00:00:00").toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </div>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              cursor: "pointer",
+            }}
+          />
+        </div>
 
-        <div className="two-col-grid">
+        <div className="two-col-grid-always">
           <div>
             <button
               type="button"
@@ -385,12 +418,16 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                 backgroundColor: ruta ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
-                color: "white"
+                color: "white",
               }}
             >
               {loadingRutas ? "Cargando..." : ruta || "Ruta"}
             </button>
-            {rutasError && <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>{rutasError}</p>}
+            {rutasError && (
+              <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                {rutasError}
+              </p>
+            )}
           </div>
 
           <div>
@@ -408,20 +445,24 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                 backgroundColor: cliente ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
-                color: "white"
+                color: "white",
               }}
             >
               {!ruta ? "Selecciona ruta" : loadingClientes ? "Cargando..." : cliente || "Cliente"}
             </button>
-            {clientesError && <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>{clientesError}</p>}
+            {clientesError && (
+              <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                {clientesError}
+              </p>
+            )}
           </div>
         </div>
 
-        <div>
+        <div className="two-col-grid-always">
           <button
             type="button"
-            onClick={() => setActiveModal("producto")}
-            disabled={loadingProductos}
+            onClick={() => setActiveModal("categoria")}
+            disabled={loadingCategorias}
             style={{
               width: "100%",
               padding: "1rem",
@@ -429,18 +470,44 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               minHeight: "56px",
               borderRadius: "8px",
               border: "2px solid #ddd",
-              backgroundColor: description ? "#2196F3" : "#888",
+              backgroundColor: categoriaFilter ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: "white"
+              color: "white",
             }}
           >
-            {loadingProductos ? "Cargando..." : description || "Producto"}
+            {loadingCategorias ? "Cargando..." : categorias.find((c) => c.correlativo === categoriaFilter)?.categoria || "Categoría"}
           </button>
-          {productosError && <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>{productosError}</p>}
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setActiveModal("producto")}
+              disabled={loadingProductos}
+              style={{
+                width: "100%",
+                padding: "1rem",
+                fontSize: "1.1rem",
+                minHeight: "56px",
+                borderRadius: "8px",
+                border: "2px solid #ddd",
+                backgroundColor: description ? "#2196F3" : "#888",
+                cursor: "pointer",
+                textAlign: "left",
+                color: "white",
+              }}
+            >
+              {loadingProductos ? "Cargando..." : description || "Producto"}
+            </button>
+            {productosError && (
+              <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                {productosError}
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="two-col-grid">
+        <div className="two-col-grid-always">
           <button
             type="button"
             onClick={() => setActiveModal("presentacion")}
@@ -455,7 +522,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               backgroundColor: selectedPresentacion ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: "white"
+              color: "white",
             }}
           >
             {!description ? "Selecciona producto" : selectedPresentacion?.presentacion || "Presentación"}
@@ -463,8 +530,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
 
           <button
             type="button"
-            onClick={() => setActiveModal("tamano")}
-            disabled={!description || loadingProductos}
+            onClick={() => setActiveModal("sabor")}
+            disabled={!description || loadingProductos || sabores.length === 0 || availableSabores.length === 0}
             style={{
               width: "100%",
               padding: "1rem",
@@ -472,36 +539,37 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               minHeight: "56px",
               borderRadius: "8px",
               border: "2px solid #ddd",
-              backgroundColor: selectedTamano ? "#2196F3" : "#888",
+              backgroundColor: selectedSabor ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
-              color: "white"
+              color: "white",
+              opacity: sabores.length === 0 || availableSabores.length === 0 ? 0.5 : 1,
             }}
           >
-            {!description ? "Selecciona producto" : selectedTamano?.tamano || "Tamaño"}
+            {!description ? "Selecciona producto" : selectedSabor?.sabor || "Sabor"}
           </button>
         </div>
 
-        <div>
-          <button
-            type="button"
-            onClick={() => setActiveModal("cantidad")}
-            style={{
-              width: "100%",
-              padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
-              borderRadius: "8px",
-              border: "2px solid #ddd",
-              backgroundColor: amount ? "#2196F3" : "#888",
-              cursor: "pointer",
-              textAlign: "left",
-              color: "white"
-            }}
-          >
-            {amount || "Cantidad"}
-          </button>
-        </div>
+        <input
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Cantidad"
+          min="1"
+          step="1"
+          style={{
+            width: "100%",
+            padding: "1rem",
+            fontSize: "1.1rem",
+            minHeight: "56px",
+            borderRadius: "8px",
+            border: "2px solid #ddd",
+            backgroundColor: amount ? "#2196F3" : "#888",
+            color: "white",
+            WebkitTextFillColor: "white",
+            textAlign: "left",
+          }}
+        />
 
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
           {editingRow && (
@@ -512,13 +580,12 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                 flex: 1,
                 padding: "1.25rem",
                 fontSize: "1.25rem",
-                fontWeight: "700",
                 minHeight: "64px",
                 borderRadius: "8px",
                 backgroundColor: "#6c757d",
                 color: "white",
                 border: "none",
-                cursor: "pointer"
+                cursor: "pointer",
               }}
             >
               Cancelar
@@ -526,469 +593,287 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           )}
           <button
             type="submit"
-            disabled={saving || !date || !ruta || !cliente || !description || !productoCorrelativo || !tamanoCorrelativo || !amount}
+            disabled={saving || !date || !ruta || !cliente || !description || !productoCorrelativo || !amount}
             style={{
               flex: 1,
               padding: "1.25rem",
               fontSize: "1.25rem",
-              fontWeight: "700",
               minHeight: "64px",
               borderRadius: "8px",
               backgroundColor: "#28a745",
               color: "white",
               border: "none",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
-            {saving ? (editingRow ? "Actualizando…" : "Guardando…") : (editingRow ? "Actualizar" : "Guardar")}
+            {saving ? (editingRow ? "Actualizando…" : "Guardando…") : editingRow ? "Actualizar" : "Guardar"}
           </button>
         </div>
 
-        {status && <p className="status" role="status" style={{ fontSize: "1rem", marginTop: "1rem" }}>{status}</p>}
+        {status && (
+          <p className="status" role="status" style={{ fontSize: "1rem", marginTop: "1rem" }}>
+            {status}
+          </p>
+        )}
       </form>
 
       {/* Selection Modals */}
-      {activeModal && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            zIndex: 1000,
-            overflow: "auto"
-          }}
-          onClick={() => setActiveModal(null)}
-        >
+      {activeModal &&
+        createPortal(
           <div
             style={{
-              backgroundColor: "white",
-              borderTopLeftRadius: "16px",
-              borderTopRightRadius: "16px",
-              maxHeight: "80vh",
-              display: "flex",
-              flexDirection: "column"
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{
-              padding: "1.5rem",
-              borderBottom: "1px solid #e0e0e0",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
-              <h3 style={{ margin: 0, fontSize: "1.3rem" }}>
-                {activeModal === "ruta" && "Selecciona Ruta"}
-                {activeModal === "cliente" && "Selecciona Cliente"}
-                {activeModal === "producto" && "Selecciona Producto"}
-                {activeModal === "presentacion" && "Selecciona Presentación"}
-                {activeModal === "tamano" && "Selecciona Tamaño"}
-                {activeModal === "cantidad" && "Ingresa Cantidad"}
-                {activeModal === "fecha" && "Selecciona Fecha"}
-              </h3>
-              <button
-                onClick={() => setActiveModal(null)}
-                style={{
-                  border: "none",
-                  background: "none",
-                  fontSize: "1.5rem",
-                  cursor: "pointer",
-                  padding: "0.5rem",
-                  lineHeight: 1
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            <div style={{
-              padding: "1rem",
-              overflowY: "auto",
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
               display: "flex",
               flexDirection: "column",
-              gap: "0.75rem"
-            }}>
-              {activeModal === "ruta" && [...rutas].sort((a, b) => a.ruta.localeCompare(b.ruta)).map((r) => (
+              justifyContent: "flex-end",
+              zIndex: 1000,
+              overflow: "auto",
+            }}
+            onClick={() => setActiveModal(null)}
+          >
+            <div
+              style={{
+                backgroundColor: "white",
+                borderTopLeftRadius: "16px",
+                borderTopRightRadius: "16px",
+                maxHeight: "80vh",
+                display: "flex",
+                flexDirection: "column",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  padding: "1.5rem",
+                  borderBottom: "1px solid #e0e0e0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "1.3rem" }}>
+                  {activeModal === "ruta" && "Selecciona Ruta"}
+                  {activeModal === "cliente" && "Selecciona Cliente"}
+                  {activeModal === "categoria" && "Filtrar por Categoría"}
+                  {activeModal === "producto" && "Selecciona Producto"}
+                  {activeModal === "presentacion" && "Selecciona Presentación"}
+                  {activeModal === "sabor" && "Selecciona Sabor"}
+                </h3>
                 <button
-                  key={r.correlativo}
-                  onClick={() => {
-                    setRuta(r.ruta);
-                    setCliente(""); // Reset cliente when ruta changes
-                    setActiveModal(null);
-                  }}
+                  onClick={() => setActiveModal(null)}
                   style={{
-                    padding: "1.25rem",
-                    fontSize: "1.1rem",
-                    fontWeight: "600",
-                    border: "2px solid #ddd",
-                    backgroundColor: ruta === r.ruta ? "#e3f2fd" : "white",
-                    borderColor: ruta === r.ruta ? "#2196F3" : "#ddd",
-                    borderRadius: "8px",
+                    border: "none",
+                    background: "none",
+                    fontSize: "1.5rem",
                     cursor: "pointer",
-                    minHeight: "70px",
-                    transition: "all 0.2s",
-                    color: "#000"
+                    padding: "0.5rem",
+                    lineHeight: 1,
                   }}
                 >
-                  {r.ruta}
+                  ✕
                 </button>
-              ))}
-              {activeModal === "cliente" && [...filteredClientes].sort((a, b) => a.cliente.localeCompare(b.cliente)).map((c) => (
-                <button
-                  key={c.cliente}
-                  onClick={() => {
-                    setCliente(c.cliente);
-                    setActiveModal(null);
-                  }}
-                  style={{
-                    padding: "1.25rem",
-                    fontSize: "1.1rem",
-                    fontWeight: "600",
-                    border: "2px solid #ddd",
-                    backgroundColor: cliente === c.cliente ? "#e3f2fd" : "white",
-                    borderColor: cliente === c.cliente ? "#2196F3" : "#ddd",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    minHeight: "70px",
-                    transition: "all 0.2s",
-                    color: "#000"
-                  }}
-                >
-                  {c.cliente}
-                </button>
-              ))}
-              {activeModal === "producto" && uniqueDescripciones.map((desc) => (
-                <button
-                  key={desc}
-                  onClick={() => {
-                    setDescription(desc);
-                    setProductoCorrelativo(""); // Reset presentacion when producto changes
-                    setTamanoCorrelativo(""); // Reset tamano when producto changes
-                    setActiveModal(null);
-                  }}
-                  style={{
-                    padding: "1.25rem",
-                    fontSize: "1.1rem",
-                    fontWeight: "600",
-                    border: "2px solid #ddd",
-                    backgroundColor: description === desc ? "#e3f2fd" : "white",
-                    borderColor: description === desc ? "#2196F3" : "#ddd",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    minHeight: "70px",
-                    transition: "all 0.2s",
-                    color: "#000"
-                  }}
-                >
-                  {desc}
-                </button>
-              ))}
-              {activeModal === "presentacion" && availablePresentaciones.map((p) => (
-                <button
-                  key={p.correlativo}
-                  onClick={() => {
-                    setProductoCorrelativo(p.correlativo);
-                    setActiveModal(null);
-                  }}
-                  style={{
-                    padding: "1.25rem",
-                    fontSize: "1.1rem",
-                    fontWeight: "600",
-                    border: "2px solid #ddd",
-                    backgroundColor: productoCorrelativo === p.correlativo ? "#e3f2fd" : "white",
-                    borderColor: productoCorrelativo === p.correlativo ? "#2196F3" : "#ddd",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    minHeight: "70px",
-                    transition: "all 0.2s",
-                    color: "#000"
-                  }}
-                >
-                  {p.presentacion}
-                </button>
-              ))}
-              {activeModal === "tamano" && availableTamanos.map((t) => (
-                <button
-                  key={t.correlativo}
-                  onClick={() => {
-                    setTamanoCorrelativo(t.correlativo);
-                    setActiveModal(null);
-                  }}
-                  style={{
-                    padding: "1.25rem",
-                    fontSize: "1.1rem",
-                    fontWeight: "600",
-                    border: "2px solid #ddd",
-                    backgroundColor: tamanoCorrelativo === t.correlativo ? "#e3f2fd" : "white",
-                    borderColor: tamanoCorrelativo === t.correlativo ? "#2196F3" : "#ddd",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    minHeight: "70px",
-                    transition: "all 0.2s",
-                    color: "#000"
-                  }}
-                >
-                  {t.tamano}
-                </button>
-              ))}
-              {activeModal === "cantidad" && (
-                <>
-                  <div
-                    style={{
-                      padding: "2rem",
-                      fontSize: "3rem",
-                      minHeight: "100px",
-                      textAlign: "center",
-                      borderRadius: "8px",
-                      border: "2px solid #ddd",
-                      fontWeight: "700",
-                      backgroundColor: "#f9f9f9",
-                      marginBottom: "1.5rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}
-                  >
-                    {amount || "0"}
-                  </div>
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: "0.75rem",
-                    maxWidth: "400px",
-                    margin: "0 auto",
-                    width: "100%"
-                  }}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+              </div>
+              <div
+                style={{
+                  padding: "1rem",
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.75rem",
+                }}
+              >
+                {activeModal === "ruta" &&
+                  [...rutas]
+                    .sort((a, b) => a.ruta.localeCompare(b.ruta))
+                    .map((r) => (
                       <button
-                        key={num}
-                        type="button"
-                        onClick={() => setAmount(prev => prev + String(num))}
+                        key={r.correlativo}
+                        onClick={() => {
+                          setRuta(r.ruta);
+                          setCliente(""); // Reset cliente when ruta changes
+                          setActiveModal(null);
+                        }}
                         style={{
-                          padding: "1.5rem",
-                          fontSize: "1.5rem",
-                          fontWeight: "600",
+                          padding: "1.25rem",
+                          fontSize: "1.1rem",
                           border: "2px solid #ddd",
-                          backgroundColor: "white",
+                          backgroundColor: ruta === r.ruta ? "#e3f2fd" : "white",
+                          borderColor: ruta === r.ruta ? "#2196F3" : "#ddd",
                           borderRadius: "8px",
                           cursor: "pointer",
                           minHeight: "70px",
                           transition: "all 0.2s",
-                          color: "#000"
+                          color: "#000",
                         }}
                       >
-                        {num}
+                        {r.ruta}
                       </button>
                     ))}
+                {activeModal === "cliente" &&
+                  [...filteredClientes]
+                    .sort((a, b) => a.cliente.localeCompare(b.cliente))
+                    .map((c) => (
+                      <button
+                        key={c.cliente}
+                        onClick={() => {
+                          setCliente(c.cliente);
+                          setActiveModal(null);
+                        }}
+                        style={{
+                          padding: "1.25rem",
+                          fontSize: "1.1rem",
+                          border: "2px solid #ddd",
+                          backgroundColor: cliente === c.cliente ? "#e3f2fd" : "white",
+                          borderColor: cliente === c.cliente ? "#2196F3" : "#ddd",
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          minHeight: "70px",
+                          transition: "all 0.2s",
+                          color: "#000",
+                        }}
+                      >
+                        {c.cliente}
+                      </button>
+                    ))}
+                {activeModal === "categoria" && (
+                  <>
                     <button
-                      type="button"
-                      onClick={() => setAmount("")}
-                      style={{
-                        padding: "1.5rem",
-                        fontSize: "1.2rem",
-                        fontWeight: "600",
-                        border: "2px solid #dc3545",
-                        backgroundColor: "#ffe5e5",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        minHeight: "70px",
-                        transition: "all 0.2s",
-                        color: "#000"
+                      onClick={() => {
+                        setCategoriaFilter("");
+                        setDescription("");
+                        setProductoCorrelativo("");
+                        setSaborCorrelativo("");
+                        setActiveModal(null);
                       }}
-                    >
-                      Limpiar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAmount(prev => prev + "0")}
                       style={{
-                        padding: "1.5rem",
-                        fontSize: "1.5rem",
-                        fontWeight: "600",
+                        padding: "1.25rem",
+                        fontSize: "1.1rem",
                         border: "2px solid #ddd",
-                        backgroundColor: "white",
+                        backgroundColor: !categoriaFilter ? "#e3f2fd" : "white",
+                        borderColor: !categoriaFilter ? "#2196F3" : "#ddd",
                         borderRadius: "8px",
                         cursor: "pointer",
                         minHeight: "70px",
                         transition: "all 0.2s",
-                        color: "#000"
+                        color: "#000",
                       }}
                     >
-                      0
+                      Todas las categorías
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setAmount(prev => prev.slice(0, -1))}
-                      style={{
-                        padding: "1.5rem",
-                        fontSize: "1.2rem",
-                        fontWeight: "600",
-                        border: "2px solid #ffc107",
-                        backgroundColor: "#fff9e6",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        minHeight: "70px",
-                        transition: "all 0.2s",
-                        color: "#000"
-                      }}
-                    >
-                      ⌫
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveModal(null)}
-                    style={{
-                      marginTop: "1.5rem",
-                      padding: "1.25rem",
-                      fontSize: "1.25rem",
-                      fontWeight: "700",
-                      border: "none",
-                      backgroundColor: "#2196F3",
-                      color: "white",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      minHeight: "60px"
-                    }}
-                  >
-                    Listo
-                  </button>
-                </>
-              )}
-              {activeModal === "fecha" && (() => {
-                const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-                const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
-                const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-                const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-
-                const days = [];
-                for (let i = 0; i < firstDayOfMonth; i++) {
-                  days.push(null);
-                }
-                for (let day = 1; day <= daysInMonth; day++) {
-                  days.push(day);
-                }
-
-                const handleDateSelect = (day: number) => {
-                  const selectedDate = new Date(viewYear, viewMonth, day);
-                  setDate(selectedDate.toISOString().slice(0, 10));
-                  setActiveModal(null);
-                };
-
-                const goToPreviousMonth = () => {
-                  if (viewMonth === 0) {
-                    setViewMonth(11);
-                    setViewYear(viewYear - 1);
-                  } else {
-                    setViewMonth(viewMonth - 1);
-                  }
-                };
-
-                const goToNextMonth = () => {
-                  if (viewMonth === 11) {
-                    setViewMonth(0);
-                    setViewYear(viewYear + 1);
-                  } else {
-                    setViewMonth(viewMonth + 1);
-                  }
-                };
-
-                const isToday = (day: number) => {
-                  const today = new Date();
-                  return day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-                };
-
-                const isSelected = (day: number) => {
-                  return date === `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                };
-
-                return (
-                  <div style={{ width: "100%" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", gap: "1rem" }}>
-                      <button
-                        type="button"
-                        onClick={goToPreviousMonth}
-                        style={{
-                          padding: "0.75rem 1.25rem",
-                          fontSize: "1.5rem",
-                          border: "2px solid #ddd",
-                          backgroundColor: "white",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                          color: "#000",
-                          minWidth: "60px"
-                        }}
-                      >
-                        ←
-                      </button>
-                      <div style={{ fontSize: "1.3rem", fontWeight: "600", textAlign: "center", flex: 1 }}>
-                        {monthNames[viewMonth]} {viewYear}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={goToNextMonth}
-                        style={{
-                          padding: "0.75rem 1.25rem",
-                          fontSize: "1.5rem",
-                          border: "2px solid #ddd",
-                          backgroundColor: "white",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                          color: "#000",
-                          minWidth: "60px"
-                        }}
-                      >
-                        →
-                      </button>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "0.75rem", marginBottom: "0.75rem" }}>
-                      {dayNames.map(name => (
-                        <div key={name} style={{ textAlign: "center", fontWeight: "600", fontSize: "1rem", padding: "0.5rem", color: "#666" }}>
-                          {name}
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "0.75rem" }}>
-                      {days.map((day, index) => day === null ? (
-                        <div key={`empty-${index}`} />
-                      ) : (
+                    {[...categorias]
+                      .sort((a, b) => a.categoria.localeCompare(b.categoria))
+                      .map((c) => (
                         <button
-                          key={day}
-                          type="button"
-                          onClick={() => handleDateSelect(day)}
+                          key={c.correlativo}
+                          onClick={() => {
+                            setCategoriaFilter(c.correlativo);
+                            setDescription(""); // Reset producto when categoria changes
+                            setProductoCorrelativo("");
+                            setSaborCorrelativo("");
+                            setActiveModal(null);
+                          }}
                           style={{
-                            padding: "0.75rem",
+                            padding: "1.25rem",
                             fontSize: "1.1rem",
-                            fontWeight: "600",
-                            border: isSelected(day) ? "3px solid #2196F3" : isToday(day) ? "2px solid #2196F3" : "2px solid #ddd",
-                            backgroundColor: isSelected(day) ? "#e3f2fd" : "white",
+                            border: "2px solid #ddd",
+                            backgroundColor: categoriaFilter === c.correlativo ? "#e3f2fd" : "white",
+                            borderColor: categoriaFilter === c.correlativo ? "#2196F3" : "#ddd",
                             borderRadius: "8px",
                             cursor: "pointer",
-                            minHeight: "60px",
+                            minHeight: "70px",
                             transition: "all 0.2s",
                             color: "#000",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center"
                           }}
                         >
-                          {day}
+                          {c.categoria}
                         </button>
                       ))}
-                    </div>
-                  </div>
-                );
-              })()}
+                  </>
+                )}
+                {activeModal === "producto" &&
+                  uniqueDescripciones.map((desc) => (
+                    <button
+                      key={desc}
+                      onClick={() => {
+                        setDescription(desc);
+                        setProductoCorrelativo(""); // Reset presentacion when producto changes
+                        setSaborCorrelativo(""); // Reset tamano when producto changes
+                        setActiveModal(null);
+                      }}
+                      style={{
+                        padding: "1.25rem",
+                        fontSize: "1.1rem",
+                        border: "2px solid #ddd",
+                        backgroundColor: description === desc ? "#e3f2fd" : "white",
+                        borderColor: description === desc ? "#2196F3" : "#ddd",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        minHeight: "70px",
+                        transition: "all 0.2s",
+                        color: "#000",
+                      }}
+                    >
+                      {desc}
+                    </button>
+                  ))}
+                {activeModal === "presentacion" &&
+                  availablePresentaciones.map((p) => (
+                    <button
+                      key={p.correlativo}
+                      onClick={() => {
+                        setProductoCorrelativo(p.correlativo);
+                        setActiveModal(null);
+                      }}
+                      style={{
+                        padding: "1.25rem",
+                        fontSize: "1.1rem",
+                        border: "2px solid #ddd",
+                        backgroundColor: productoCorrelativo === p.correlativo ? "#e3f2fd" : "white",
+                        borderColor: productoCorrelativo === p.correlativo ? "#2196F3" : "#ddd",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        minHeight: "70px",
+                        transition: "all 0.2s",
+                        color: "#000",
+                      }}
+                    >
+                      {p.presentacion}
+                    </button>
+                  ))}
+                {activeModal === "sabor" &&
+                  availableSabores.map((s) => (
+                    <button
+                      key={s.correlativo}
+                      onClick={() => {
+                        setSaborCorrelativo(s.correlativo);
+                        setActiveModal(null);
+                      }}
+                      style={{
+                        padding: "1.25rem",
+                        fontSize: "1.1rem",
+                        border: "2px solid #ddd",
+                        backgroundColor: saborCorrelativo === s.correlativo ? "#e3f2fd" : "white",
+                        borderColor: saborCorrelativo === s.correlativo ? "#2196F3" : "#ddd",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        minHeight: "70px",
+                        transition: "all 0.2s",
+                        color: "#000",
+                      }}
+                    >
+                      {s.sabor}
+                    </button>
+                  ))}
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

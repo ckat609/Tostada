@@ -1,32 +1,51 @@
 import { useState } from "react";
-import type { Cliente } from "../lib/graph";
-import { deleteCliente } from "../lib/graph";
+import type { Producto, Categoria, Sabor, Presentacion } from "../lib/graph";
+import { deleteProducto } from "../lib/graph";
 
-interface ClienteListProps {
-  clientes: Cliente[];
-  rutaFilter: string;
+interface ProductoListProps {
+  productos: Producto[];
+  categorias: Categoria[];
+  sabores: Sabor[];
+  presentaciones: Presentacion[];
   loading: boolean;
   error: string;
   accessToken: string;
   onRefresh: () => void | Promise<void>;
-  onEdit: (cliente: Cliente) => void;
-  editingCliente: Cliente | null;
+  onEdit: (producto: Producto) => void;
+  editingProducto: Producto | null;
 }
 
-export function ClienteList({ clientes, rutaFilter, loading, error, accessToken, onRefresh, onEdit, editingCliente }: ClienteListProps) {
-  const [deletingCliente, setDeletingCliente] = useState<Cliente | null>(null);
+export function ProductoList({ productos, categorias, sabores, presentaciones, loading, error, accessToken, onRefresh, onEdit, editingProducto }: ProductoListProps) {
+  const [deletingProducto, setDeletingProducto] = useState<Producto | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const filteredClientes = rutaFilter
-    ? clientes.filter(c => c.ruta === rutaFilter).sort((a, b) => a.cliente.localeCompare(b.cliente))
-    : [];
+  const sortedProductos = [...productos].sort((a, b) => a.producto.localeCompare(b.producto));
+
+  const categoriaNombre = (correlativo: string) => {
+    if (!correlativo) return "—";
+    return categorias.find(c => c.correlativo === correlativo)?.categoria || correlativo;
+  };
+  const saboresNombres = (correlativos: string) => {
+    if (!correlativos || !correlativos.trim()) return "—";
+    return correlativos.split(",").map(c => {
+      const trimmed = c.trim();
+      return sabores.find(s => s.correlativo === trimmed)?.sabor || trimmed;
+    }).filter(s => s).join(", ");
+  };
+  const presentacionesNombres = (correlativos: string) => {
+    if (!correlativos || !correlativos.trim()) return "—";
+    return correlativos.split(",").map(c => {
+      const trimmed = c.trim();
+      return presentaciones.find(p => p.correlativo === trimmed)?.presentacion || trimmed;
+    }).filter(p => p).join(", ");
+  };
 
   const confirmDelete = async () => {
-    if (!deletingCliente) return;
+    if (!deletingProducto) return;
 
     try {
-      await deleteCliente(accessToken, deletingCliente.rowIndex);
-      setDeletingCliente(null);
+      await deleteProducto(accessToken, deletingProducto.rowIndex);
+      setDeletingProducto(null);
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -38,7 +57,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
       <div className="section-heading" style={{ marginBottom: isCollapsed ? 0 : "1.5rem" }}>
         <div>
           <p className="eyebrow">Libro de trabajo</p>
-          <h2>Clientes</h2>
+          <h2>Productos</h2>
         </div>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -68,45 +87,44 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
         opacity: isCollapsed ? 0 : 1
       }}>
 
-      {loading && <p className="muted">Cargando clientes…</p>}
+      {loading && <p className="muted">Cargando productos…</p>}
       {error && <p className="status error">{error}</p>}
-      {!loading && !error && !rutaFilter && (
-        <p className="muted">Selecciona una ruta para ver sus clientes.</p>
-      )}
-      {!loading && !error && rutaFilter && filteredClientes.length === 0 && (
-        <p className="muted">No hay clientes en esta ruta.</p>
+      {!loading && !error && sortedProductos.length === 0 && (
+        <p className="muted">No hay productos aún.</p>
       )}
 
-      {filteredClientes.length > 0 && (
+      {sortedProductos.length > 0 && (
         <>
           <div className="table-wrap desktop-only">
             <table>
               <thead>
                 <tr>
-                  <th>Cliente</th>
-                  <th>Auxiliar</th>
-                  <th>Código</th>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Presentaciones</th>
+                  <th>Sabores</th>
                   <th style={{ width: "140px" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredClientes.map((c) => {
-                  const isEditing = editingCliente?.rowIndex === c.rowIndex;
+                {sortedProductos.map((p) => {
+                  const isEditing = editingProducto?.rowIndex === p.rowIndex;
                   return (
                     <tr
-                      key={c.rowIndex}
+                      key={p.rowIndex}
                       style={{
                         backgroundColor: isEditing ? "#fff9e6" : "transparent",
                         border: isEditing ? "2px solid #f0ad4e" : "none"
                       }}
                     >
-                      <td>{c.cliente}</td>
-                      <td>{c.auxiliar}</td>
-                      <td>{c.codigo}</td>
+                      <td>{p.producto}</td>
+                      <td>{categoriaNombre(p.categoria)}</td>
+                      <td>{presentacionesNombres(p.presentaciones)}</td>
+                      <td>{saboresNombres(p.sabores)}</td>
                       <td>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                           <button
-                            onClick={() => onEdit(c)}
+                            onClick={() => onEdit(p)}
                             style={{
                               padding: "0.5rem 0.75rem",
                               fontSize: "0.9rem",
@@ -121,7 +139,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
                             Editar
                           </button>
                           <button
-                            onClick={() => setDeletingCliente(c)}
+                            onClick={() => setDeletingProducto(p)}
                             style={{
                               padding: "0.5rem 0.75rem",
                               fontSize: "0.9rem",
@@ -145,11 +163,11 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
           </div>
 
           <div className="mobile-only">
-            {filteredClientes.map((c) => {
-              const isEditing = editingCliente?.rowIndex === c.rowIndex;
+            {sortedProductos.map((p) => {
+              const isEditing = editingProducto?.rowIndex === p.rowIndex;
               return (
                 <div
-                  key={c.rowIndex}
+                  key={p.rowIndex}
                   style={{
                     backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                     border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
@@ -158,12 +176,13 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
                     marginBottom: "0.75rem"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.25rem" }}>{c.cliente}</div>
-                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>Auxiliar: {c.auxiliar}</div>
-                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.75rem" }}>Código: {c.codigo}</div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.25rem" }}>{p.producto}</div>
+                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>Categoría: {categoriaNombre(p.categoria)}</div>
+                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>Presentaciones: {presentacionesNombres(p.presentaciones)}</div>
+                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.75rem" }}>Sabores: {saboresNombres(p.sabores)}</div>
                   <div style={{ display: "flex", gap: "0.5rem" }}>
                     <button
-                      onClick={() => onEdit(c)}
+                      onClick={() => onEdit(p)}
                       style={{
                         flex: 1,
                         padding: "0.75rem",
@@ -178,7 +197,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
                       Editar
                     </button>
                     <button
-                      onClick={() => setDeletingCliente(c)}
+                      onClick={() => setDeletingProducto(p)}
                       style={{
                         flex: 1,
                         padding: "0.75rem",
@@ -201,7 +220,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
       )}
       </div>
 
-      {deletingCliente && (
+      {deletingProducto && (
         <div style={{
           position: "fixed",
           top: 0,
@@ -225,7 +244,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
             <p style={{ marginBottom: "1.5rem" }}>Esta acción no se puede deshacer.</p>
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
               <button
-                onClick={() => setDeletingCliente(null)}
+                onClick={() => setDeletingProducto(null)}
                 style={{
                   padding: "0.5rem 1rem",
                   backgroundColor: "#6c757d",

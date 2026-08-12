@@ -8,7 +8,10 @@ import { RutasView } from "./components/RutasView";
 import { ClientesView } from "./components/ClientesView";
 import { VendedoresView } from "./components/VendedoresView";
 import { CategoriasView } from "./components/CategoriasView";
-import { getRecentRows, getRutas, getPresentaciones, getTamanos, getProductos, getClientes, getVendedores, getCategorias, type RecentRow, type Ruta, type Presentacion, type Tamano, type Producto, type Cliente, type Vendedor, type Categoria } from "./lib/graph";
+import { PresentacionesView } from "./components/PresentacionesView";
+import { SaboresView } from "./components/SaboresView";
+import { ProductosView } from "./components/ProductosView";
+import { getRecentRows, getRutas, getPresentaciones, getProductos, getClientes, getVendedores, getCategorias, getSabores, type RecentRow, type Ruta, type Presentacion, type Producto, type Cliente, type Vendedor, type Categoria, type Sabor } from "./lib/graph";
 import { GOOGLE_SCOPES } from "./auth";
 
 export default function App() {
@@ -20,16 +23,19 @@ export default function App() {
   const [rowError, setRowError] = useState("");
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
-  const [tamanos, setTamanos] = useState<Tamano[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [sabores, setSabores] = useState<Sabor[]>([]);
   const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
   const [editingRuta, setEditingRuta] = useState<Ruta | null>(null);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [editingVendedor, setEditingVendedor] = useState<Vendedor | null>(null);
   const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null);
+  const [editingPresentacion, setEditingPresentacion] = useState<Presentacion | null>(null);
+  const [editingSabor, setEditingSabor] = useState<Sabor | null>(null);
+  const [editingProducto, setEditingProducto] = useState<Producto | null>(null);
   const configurationProblems = getConfigurationProblems();
 
   const handleEdit = (row: RecentRow) => {
@@ -57,30 +63,58 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleEditPresentacion = (presentacion: Presentacion) => {
+    setEditingPresentacion(presentacion);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditSabor = (sabor: Sabor) => {
+    setEditingSabor(sabor);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditProducto = (producto: Producto) => {
+    setEditingProducto(producto);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const refreshRows = useCallback(async () => {
     if (!accessToken || configurationProblems.length > 0) return;
 
     setLoadingRows(true);
     setRowError("");
     try {
-      const [rowsData, rutasData, presentacionesData, tamanosData, productosData, clientesData, vendedoresData, categoriasData] = await Promise.all([
+      const results = await Promise.allSettled([
         getRecentRows(accessToken),
         getRutas(accessToken),
         getPresentaciones(accessToken),
-        getTamanos(accessToken),
         getProductos(accessToken),
         getClientes(accessToken),
         getVendedores(accessToken),
-        getCategorias(accessToken)
+        getCategorias(accessToken),
+        getSabores(accessToken)
       ]);
-      setRows(rowsData);
-      setRutas(rutasData);
-      setPresentaciones(presentacionesData);
-      setTamanos(tamanosData);
-      setProductos(productosData);
-      setClientes(clientesData);
-      setVendedores(vendedoresData);
-      setCategorias(categoriasData);
+
+      // Extract successful results or use empty arrays for failed ones
+      const [rowsResult, rutasResult, presentacionesResult, productosResult, clientesResult, vendedoresResult, categoriasResult, saboresResult] = results;
+
+      setRows(rowsResult.status === "fulfilled" ? rowsResult.value : []);
+      setRutas(rutasResult.status === "fulfilled" ? rutasResult.value : []);
+      setPresentaciones(presentacionesResult.status === "fulfilled" ? presentacionesResult.value : []);
+      setProductos(productosResult.status === "fulfilled" ? productosResult.value : []);
+      setClientes(clientesResult.status === "fulfilled" ? clientesResult.value : []);
+      setVendedores(vendedoresResult.status === "fulfilled" ? vendedoresResult.value : []);
+      setCategorias(categoriasResult.status === "fulfilled" ? categoriasResult.value : []);
+      setSabores(saboresResult.status === "fulfilled" ? saboresResult.value : []);
+
+      // Collect any errors from failed tabs
+      const errors = results
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r) => r.reason instanceof Error ? r.reason.message : String(r.reason));
+
+      if (errors.length > 0) {
+        setRowError("Algunas pestañas no se pudieron cargar: " + errors.join(", "));
+      }
     } catch (error) {
       setRowError(error instanceof Error ? error.message : "Could not load spreadsheet rows.");
     } finally {
@@ -123,12 +157,6 @@ export default function App() {
           <p className="eyebrow">La Noria</p>
           <h1>{VIEW_TITLES[view]}</h1>
         </div>
-
-        {isAuthenticated && (
-          <button className="secondary" onClick={signOut}>
-            Cerrar sesión
-          </button>
-        )}
       </header>
 
       {configurationProblems.length > 0 && (
@@ -161,10 +189,15 @@ export default function App() {
       {isAuthenticated && (
         <>
           <section className="account-strip">
-            Sesión iniciada como <strong>{userEmail}</strong>
-            <span>
-              Hoja: <code>{appConfig.sheets.sheetName}</code>
-            </span>
+            <div>
+              Sesión iniciada como <strong>{userEmail}</strong>
+              <span>
+                Hoja: <code>{appConfig.sheets.sheetName}</code>
+              </span>
+            </div>
+            <button className="secondary" onClick={signOut}>
+              Cerrar sesión
+            </button>
           </section>
 
           {view === "ventas" && (
@@ -174,8 +207,9 @@ export default function App() {
                 rows={rows}
                 rutas={rutas}
                 presentaciones={presentaciones}
-                tamanos={tamanos}
+                sabores={sabores}
                 productos={productos}
+                categorias={categorias}
                 loading={loadingRows}
                 error={rowError}
                 accessToken={accessToken}
@@ -202,7 +236,6 @@ export default function App() {
               accessToken={accessToken}
               clientes={clientes}
               rutas={rutas}
-              vendedores={vendedores}
               loading={loadingRows}
               error={rowError}
               onRefresh={refreshRows}
@@ -233,6 +266,45 @@ export default function App() {
               editingCategoria={editingCategoria}
               onEdit={handleEditCategoria}
               onCancelEdit={() => setEditingCategoria(null)}
+            />
+          )}
+          {view === "presentaciones" && (
+            <PresentacionesView
+              accessToken={accessToken}
+              presentaciones={presentaciones}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingPresentacion={editingPresentacion}
+              onEdit={handleEditPresentacion}
+              onCancelEdit={() => setEditingPresentacion(null)}
+            />
+          )}
+          {view === "sabores" && (
+            <SaboresView
+              accessToken={accessToken}
+              sabores={sabores}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingSabor={editingSabor}
+              onEdit={handleEditSabor}
+              onCancelEdit={() => setEditingSabor(null)}
+            />
+          )}
+          {view === "productos" && (
+            <ProductosView
+              accessToken={accessToken}
+              productos={productos}
+              categorias={categorias}
+              sabores={sabores}
+              presentaciones={presentaciones}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingProducto={editingProducto}
+              onEdit={handleEditProducto}
+              onCancelEdit={() => setEditingProducto(null)}
             />
           )}
         </>

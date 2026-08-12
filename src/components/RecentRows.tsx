@@ -1,13 +1,14 @@
 import { useState } from "react";
-import type { RecentRow, Ruta, Presentacion, Tamano, Producto } from "../lib/graph";
+import type { RecentRow, Ruta, Presentacion, Sabor, Producto, Categoria } from "../lib/graph";
 import { deleteRow } from "../lib/graph";
 
 interface RecentRowsProps {
   rows: RecentRow[];
   rutas: Ruta[];
   presentaciones: Presentacion[];
-  tamanos: Tamano[];
+  sabores: Sabor[];
   productos: Producto[];
+  categorias: Categoria[];
   loading: boolean;
   error: string;
   accessToken: string;
@@ -33,7 +34,7 @@ function toMexicoTime(fecha: string): Date | null {
   return new Date(utcMs - 6 * 60 * 60 * 1000);
 }
 
-export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
+export function RecentRows({ rows, rutas, presentaciones, sabores, productos, categorias, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -104,7 +105,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
   const generateCSV = () => {
     if (filteredRows.length === 0) return null;
 
-    const headers = ["Fecha", "Hora", "Ruta", "Cliente", "Descripcion", "Presentacion", "Tamaño", "Cantidad"];
+    const headers = ["Fecha", "Hora", "Ruta", "Cliente", "Categoria", "Descripcion", "Presentacion", "Sabor", "Cantidad"];
     const csvRows = [
       headers.join(","),
       ...filteredRows.map(row => {
@@ -123,17 +124,19 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
         // Look up human-readable values
         const rutaData = rutas.find(r => r.correlativo === row.ruta);
         const productoData = productos.find(p => p.correlativo === row.descripcion);
+        const categoriaData = productoData ? categorias.find(c => c.correlativo === productoData.categoria) : null;
         const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
-        const tamano = tamanos.find(t => t.correlativo === row.tamano);
+        const sabor = sabores.find(s => s.correlativo === row.sabor);
 
         return [
           dateOnly,
           timeOnly,
           `"${rutaData?.ruta || row.ruta}"`,
           `"${row.cliente}"`,
+          `"${categoriaData?.categoria || ""}"`,
           `"${productoData?.descripcion || row.descripcion}"`,
           `"${presentacion?.presentacion || row.presentacion}"`,
-          `"${tamano?.tamano || row.tamano}"`,
+          `"${sabor?.sabor || row.sabor || "—"}"`,
           row.cantidad
         ].join(",");
       })
@@ -248,7 +251,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
             color: dateFilter === "today" ? "white" : "#333",
             border: "none",
             borderRadius: "4px",
-            fontWeight: dateFilter === "today" ? "600" : "normal",
             cursor: "pointer"
           }}
         >
@@ -262,7 +264,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
             color: dateFilter === "week" ? "white" : "#333",
             border: "none",
             borderRadius: "4px",
-            fontWeight: dateFilter === "week" ? "600" : "normal",
             cursor: "pointer"
           }}
         >
@@ -276,7 +277,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
             color: dateFilter === "month" ? "white" : "#333",
             border: "none",
             borderRadius: "4px",
-            fontWeight: dateFilter === "month" ? "600" : "normal",
             cursor: "pointer"
           }}
         >
@@ -290,7 +290,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
             color: dateFilter === "range" ? "white" : "#333",
             border: "none",
             borderRadius: "4px",
-            fontWeight: dateFilter === "range" ? "600" : "normal",
             cursor: "pointer"
           }}
         >
@@ -308,7 +307,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                 color: "white",
                 border: "none",
                 borderRadius: "4px",
-                fontWeight: "600",
                 cursor: filteredRows.length > 0 ? "pointer" : "not-allowed",
                 opacity: filteredRows.length > 0 ? 1 : 0.5
               }}
@@ -325,7 +323,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
               color: "white",
               border: "none",
               borderRadius: "4px",
-              fontWeight: "600",
               cursor: filteredRows.length > 0 ? "pointer" : "not-allowed",
               opacity: filteredRows.length > 0 ? 1 : 0.5
             }}
@@ -392,7 +389,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                   color: "white",
                   borderRadius: "6px",
                   marginBottom: "1.5rem",
-                  fontWeight: "700",
                   fontSize: "1.2rem",
                   textTransform: "capitalize",
                   letterSpacing: "0.5px"
@@ -407,7 +403,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                       backgroundColor: "#f5f5f5",
                       borderLeft: "4px solid #666",
                       marginBottom: "0.75rem",
-                      fontWeight: "600",
                       fontSize: "0.95rem",
                       color: "#333"
                     }}>
@@ -423,7 +418,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                           <th>Cliente</th>
                           <th>Descripcion</th>
                           <th>Presentacion</th>
-                          <th>Tamaño</th>
+                          <th>Sabor</th>
                           <th>Cantidad</th>
                           <th style={{ width: "140px" }}>Acciones</th>
                         </tr>
@@ -431,7 +426,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                       <tbody>
                         {rutaGroup.items.map((row, index) => {
                           const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
-                          const tamano = tamanos.find(t => t.correlativo === row.tamano);
+                          const sabor = sabores.find(s => s.correlativo === row.sabor);
                           const producto = productos.find(p => p.correlativo === row.descripcion);
                           const isEditing = editingRow?.rowIndex === row.rowIndex;
                           // Convert UTC timestamp to Mexico Central Time (UTC-6)
@@ -446,7 +441,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                             <td>{row.cliente}</td>
                             <td>{producto?.descripcion || row.descripcion}</td>
                             <td>{presentacion?.presentacion || row.presentacion}</td>
-                            <td>{tamano?.tamano || row.tamano}</td>
+                            <td>{sabor?.sabor || row.sabor || "—"}</td>
                             <td>{row.cantidad}</td>
                             <td>
                               <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -460,7 +455,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                                     border: "none",
                                     borderRadius: "6px",
                                     cursor: "pointer",
-                                    fontWeight: "600",
                                     minWidth: "60px"
                                   }}
                                 >
@@ -476,7 +470,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                                     border: "none",
                                     borderRadius: "6px",
                                     cursor: "pointer",
-                                    fontWeight: "600",
                                     minWidth: "60px"
                                   }}
                                 >
@@ -495,7 +488,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                   <div className="mobile-only">
                     {rutaGroup.items.map((row, index) => {
                       const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
-                      const tamano = tamanos.find(t => t.correlativo === row.tamano);
+                      const sabor = sabores.find(s => s.correlativo === row.sabor);
                       const producto = productos.find(p => p.correlativo === row.descripcion);
                       const isEditing = editingRow?.rowIndex === row.rowIndex;
                       // Convert UTC timestamp to Mexico Central Time (UTC-6)
@@ -513,7 +506,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                           }}
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                            <div style={{ fontWeight: "700", fontSize: "1.1rem", color: "#333" }}>
+                            <div style={{ fontSize: "1.1rem", color: "#333" }}>
                               {row.cliente}
                             </div>
                             <div style={{ fontSize: "0.9rem", color: "#666" }}>
@@ -523,7 +516,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                           <div style={{ display: "grid", gap: "0.25rem", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
                             <div><span style={{ color: "#666" }}>Descripcion:</span> {producto?.descripcion || row.descripcion}</div>
                             <div><span style={{ color: "#666" }}>Presentacion:</span> {presentacion?.presentacion || row.presentacion}</div>
-                            <div><span style={{ color: "#666" }}>Tamaño:</span> {tamano?.tamano || row.tamano}</div>
+                            <div><span style={{ color: "#666" }}>Sabor:</span> {sabor?.sabor || row.sabor || "—"}</div>
                             <div><span style={{ color: "#666" }}>Cantidad:</span> {row.cantidad}</div>
                           </div>
                           <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -538,7 +531,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                                 border: "none",
                                 borderRadius: "6px",
                                 cursor: "pointer",
-                                fontWeight: "600"
                               }}
                             >
                               Editar
@@ -554,7 +546,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                                 border: "none",
                                 borderRadius: "6px",
                                 cursor: "pointer",
-                                fontWeight: "600"
                               }}
                             >
                               Borrar
@@ -618,7 +609,6 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                   border: "none",
                   borderRadius: "4px",
                   cursor: "pointer",
-                  fontWeight: "600"
                 }}
               >
                 Eliminar
