@@ -7,12 +7,13 @@ interfaces.
 
 - **Google Sheets Integration**: Direct read/write access to your spreadsheet
 - **Multi-page Navigation**: Hamburger menu for switching between Registro de Ventas, Rutas, Clientes, Vendedores, Categorías, Presentaciones, Sabores, and Productos
-- **Mobile-First Design**: Large touch-friendly buttons and modal-based inputs, native device inputs for date and quantity
+- **Mobile-First Design**: Large touch-friendly buttons and modal-based inputs, native device inputs for date, cantidad, and precio
+- **Pricing Tracking**: Automatic calculation of precio_total (cantidad × precio_unitario) for revenue tracking
 - **Auto-incrementing IDs**: Automatic `correlativo` generation for every new row, on every sheet
 - **Audit Trail**: `agregado`/`editado` timestamps recorded automatically on create/edit (all sheets except ventas)
 - **Smart Filtering**: View sales by today, week, month, or custom date range; filter productos by categoria
 - **Edit & Delete**: Modify or soft-delete entries directly from the interface (nothing is ever hard-deleted)
-- **Export Options**: Share or download sales data as CSV with categoria column
+- **Export Options**: Share or download sales data as CSV with categoria, precio unitario, and precio total columns
 - **Real-time Sync**: Changes reflect immediately in Google Sheets
 - **Multi-sheet Support**: Integrates with rutas, clientes, vendedores, categorías, presentaciones, sabores, and productos sheets
 - **Multi-select Support**: Productos can have multiple presentaciones and sabores via checkbox interface
@@ -66,9 +67,9 @@ row is added through the app.
 
 ### Sheet: `ventas`
 
-Headers: `correlativo`, `fecha`, `ruta`, `cliente`, `descripcion`, `presentacion`, `sabor`, `cantidad`, `estado`
+Headers: `correlativo`, `fecha`, `ruta`, `cliente`, `descripcion`, `presentacion`, `sabor`, `cantidad`, `precio_unitario`, `precio_total`, `estado`
 
-`ruta` stores the correlativo of a row in `rutas`; `cliente` stores the correlativo of the matching row in `clientes`; `descripcion` stores the correlativo of a row in `productos`; `presentacion` stores the correlativo of a row in `presentaciones`; `sabor` stores the correlativo of a row in `sabores`. `estado` is used for soft delete (set to `deleted`).
+`ruta` stores the correlativo of a row in `rutas`; `cliente` stores the correlativo of the matching row in `clientes`; `descripcion` stores the correlativo of a row in `productos`; `presentacion` stores the correlativo of a row in `presentaciones`; `sabor` stores the correlativo of a row in `sabores`. `precio_total` is automatically calculated as `cantidad × precio_unitario`. `estado` is used for soft delete (set to `deleted`).
 
 ### Sheet: `rutas`
 
@@ -142,7 +143,7 @@ Common free/cheap static hosts include Cloudflare Pages, Netlify, and Vercel. Th
    - Ruta → Cliente (cascading modal selection)
    - Categoría (optional filter) → Producto (modal selection)
    - Presentación / Sabor (cascading modal selection, sabor only shown if producto has sabores)
-   - Cantidad (native number input)
+   - Cantidad and Precio (native number inputs, precio_total calculated automatically)
 4. **Maintenance pages (Rutas / Clientes / Vendedores / Categorías / Presentaciones / Sabores)**: Each has its own "Agregar" form and "Libro de trabajo" list with a collapse arrow, inline edit, and delete. Clientes additionally has a Ruta dropdown and Código/Auxiliar fields, and its list filters by the ruta selected in the form.
 5. **Productos page**: Multi-select interface with categoria dropdown, and checkbox grids for presentaciones and sabores. At least one presentacion is required; sabores are optional.
 6. **Auto-increment**: The `correlativo` field auto-increments on every new row, on every sheet
@@ -150,7 +151,7 @@ Common free/cheap static hosts include Cloudflare Pages, Netlify, and Vercel. Th
 8. **View Sales**: Grouped by date and ruta with collapsible sections
 9. **Filtering**: Filter ventas by today, last week, last month, or custom range
 10. **Edit/Delete**: Click "Editar" or "Borrar" on any entry; deletes are soft (the `estado` column is set to `deleted`, nothing is removed from the sheet)
-11. **Export**: Share via native share sheet or download as CSV with categoria column included (ventas only)
+11. **Export**: Share via native share sheet or download as CSV with categoria, precio unitario, and precio total columns included (ventas only)
 
 ## Project Structure
 
@@ -180,10 +181,11 @@ src/
 ### Mobile-First UI
 
 - Modal-based selection for ruta, cliente, categoria, producto, presentacion, and sabor in Registro de Ventas
-- Native device inputs for date and cantidad (better UX on mobile)
+- Native device inputs for date, cantidad, and precio (better UX on mobile)
 - Large tap targets (56px minimum height) throughout
-- Two-column layout maintained on all screen sizes for paired fields
+- Two-column layout maintained on all screen sizes for paired fields (cantidad/precio, presentacion/sabor, etc.)
 - Checkbox grids with visual feedback for multi-select (productos page)
+- Automatic price calculation (precio_total = cantidad × precio_unitario)
 
 ### Navigation
 
