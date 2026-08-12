@@ -18,14 +18,19 @@ interface RecentRowsProps {
 
 type DateFilter = "today" | "week" | "month" | "range";
 
-// Convert a "YYYY-MM-DD HH:MM:SS" UTC timestamp to Mexico Central Time (UTC-6).
-// Returns null if the timestamp isn't in the expected format (e.g. a row edited
-// manually in Google Sheets, which can store dates in a locale-specific format).
+// Convert a "YYYY-MM-DD H:MM:SS" UTC timestamp to Mexico Central Time (UTC-6).
+// Hour/minute/second may be 1 or 2 digits, since Google Sheets drops the
+// leading zero when formatting a datetime cell that was typed in manually.
+// Returns null if the timestamp doesn't match at all (e.g. a locale-specific
+// date format from a manual edit, like "8/8/2026").
+const FECHA_PATTERN = /^(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
+
 function toMexicoTime(fecha: string): Date | null {
-  if (!fecha.includes(" ")) return null;
-  const utcDate = new Date(fecha.replace(" ", "T") + "Z");
-  if (isNaN(utcDate.getTime())) return null;
-  return new Date(utcDate.getTime() - 6 * 60 * 60 * 1000);
+  const match = fecha.match(FECHA_PATTERN);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute, second);
+  return new Date(utcMs - 6 * 60 * 60 * 1000);
 }
 
 export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
@@ -116,10 +121,10 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
         }
 
         // Look up human-readable values
-        const rutaData = rutas.find(r => r.codigo === row.ruta);
-        const productoData = productos.find(p => p.codigo === row.descripcion);
-        const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
-        const tamano = tamanos.find(t => t.codigo === row.tamano);
+        const rutaData = rutas.find(r => r.correlativo === row.ruta);
+        const productoData = productos.find(p => p.correlativo === row.descripcion);
+        const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
+        const tamano = tamanos.find(t => t.correlativo === row.tamano);
 
         return [
           dateOnly,
@@ -406,7 +411,7 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                       fontSize: "0.95rem",
                       color: "#333"
                     }}>
-                      {rutas.find(r => r.codigo === rutaGroup.ruta)?.ruta || rutaGroup.ruta}
+                      {rutas.find(r => r.correlativo === rutaGroup.ruta)?.ruta || rutaGroup.ruta}
                     </div>
                   )}
                   {/* Desktop: Table view */}
@@ -425,9 +430,9 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                       </thead>
                       <tbody>
                         {rutaGroup.items.map((row, index) => {
-                          const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
-                          const tamano = tamanos.find(t => t.codigo === row.tamano);
-                          const producto = productos.find(p => p.codigo === row.descripcion);
+                          const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
+                          const tamano = tamanos.find(t => t.correlativo === row.tamano);
+                          const producto = productos.find(p => p.correlativo === row.descripcion);
                           const isEditing = editingRow?.rowIndex === row.rowIndex;
                           // Convert UTC timestamp to Mexico Central Time (UTC-6)
                           const mexicoTime = toMexicoTime(row.fecha);
@@ -489,9 +494,9 @@ export function RecentRows({ rows, rutas, presentaciones, tamanos, productos, lo
                   {/* Mobile: Card view */}
                   <div className="mobile-only">
                     {rutaGroup.items.map((row, index) => {
-                      const presentacion = presentaciones.find(p => p.codigo === row.presentacion);
-                      const tamano = tamanos.find(t => t.codigo === row.tamano);
-                      const producto = productos.find(p => p.codigo === row.descripcion);
+                      const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
+                      const tamano = tamanos.find(t => t.correlativo === row.tamano);
+                      const producto = productos.find(p => p.correlativo === row.descripcion);
                       const isEditing = editingRow?.rowIndex === row.rowIndex;
                       // Convert UTC timestamp to Mexico Central Time (UTC-6)
                       const mexicoTime = toMexicoTime(row.fecha);

@@ -16,8 +16,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [ruta, setRuta] = useState("");
   const [cliente, setCliente] = useState("");
   const [description, setDescription] = useState("");
-  const [productoCodigo, setProductoCodigo] = useState(""); // Store the presentacion codigo
-  const [tamanoCodigo, setTamanoCodigo] = useState(""); // Store the tamano codigo
+  const [productoCorrelativo, setProductoCorrelativo] = useState(""); // Store the presentacion correlativo
+  const [tamanoCorrelativo, setTamanoCorrelativo] = useState(""); // Store the tamano correlativo
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -63,7 +63,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
 
   const selectedRuta = rutas.find(r => r.ruta === ruta);
-  const filteredClientes = selectedRuta ? clientes.filter(c => c.ruta === selectedRuta.codigo) : [];
+  const filteredClientes = selectedRuta ? clientes.filter(c => c.ruta === selectedRuta.correlativo) : [];
 
   // Get unique descripciones
   const uniqueDescripciones = [...new Set(productos.map(p => p.descripcion))].sort();
@@ -76,25 +76,25 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const availablePresentaciones = selectedProductoData
     ? selectedProductoData.presentacion
         .split(',')
-        .map(codigo => codigo.trim())
-        .map(codigo => presentaciones.find(p => p.codigo === codigo))
+        .map(correlativo => correlativo.trim())
+        .map(correlativo => presentaciones.find(p => p.correlativo === correlativo))
         .filter((p): p is Presentacion => p !== undefined)
     : [];
 
-  // Get selected presentacion by codigo
-  const selectedPresentacion = presentaciones.find(p => p.codigo === productoCodigo);
+  // Get selected presentacion by correlativo
+  const selectedPresentacion = presentaciones.find(p => p.correlativo === productoCorrelativo);
 
   // Get available tamanos for selected producto
   const availableTamanos = selectedProductoData
     ? selectedProductoData.tamano
         .split(',')
-        .map(codigo => codigo.trim())
-        .map(codigo => tamanos.find(t => t.codigo === codigo))
+        .map(correlativo => correlativo.trim())
+        .map(correlativo => tamanos.find(t => t.correlativo === correlativo))
         .filter((t): t is Tamano => t !== undefined)
     : [];
 
-  // Get selected tamano by codigo
-  const selectedTamano = tamanos.find(t => t.codigo === tamanoCodigo);
+  // Get selected tamano by correlativo
+  const selectedTamano = tamanos.find(t => t.correlativo === tamanoCorrelativo);
 
   useEffect(() => {
     async function fetchProductos() {
@@ -207,18 +207,18 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   // Load editing row data
   useEffect(() => {
     if (editingRow && productos.length > 0 && rutas.length > 0 && presentaciones.length > 0 && tamanos.length > 0) {
-      // Find ruta name from codigo
-      const rutaData = rutas.find(r => r.codigo === editingRow.ruta);
+      // Find ruta name from correlativo
+      const rutaData = rutas.find(r => r.correlativo === editingRow.ruta);
 
-      // Find producto name from codigo
-      const productoData = productos.find(p => p.codigo === editingRow.descripcion);
+      // Find producto name from correlativo
+      const productoData = productos.find(p => p.correlativo === editingRow.descripcion);
 
       setDate(editingRow.fecha);
       setRuta(rutaData?.ruta || "");
       setCliente(editingRow.cliente);
       setDescription(productoData?.descripcion || "");
-      setProductoCodigo(editingRow.presentacion);
-      setTamanoCodigo(editingRow.tamano);
+      setProductoCorrelativo(editingRow.presentacion);
+      setTamanoCorrelativo(editingRow.tamano);
       setAmount(editingRow.cantidad);
     }
   }, [editingRow, productos, rutas, presentaciones, tamanos]);
@@ -232,19 +232,19 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
 
     const parsedAmount = Number(amount);
-    if (!date || !ruta || !cliente || !description.trim() || !productoCodigo || !tamanoCodigo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !tamanoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setStatus("Por favor completa todos los campos requeridos.");
       return;
     }
 
-    // Find cliente codigo from cliente name
+    // Find cliente correlativo from cliente name
     const clienteData = clientes.find(c => c.cliente === cliente);
     if (!clienteData) {
       setStatus("Cliente no encontrado.");
       return;
     }
 
-    // Find producto codigo from descripcion
+    // Find producto correlativo from descripcion
     const productoData = productos.find(p => p.descripcion === description);
     if (!productoData) {
       setStatus("Producto no encontrado.");
@@ -262,10 +262,10 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         // Update existing row - keep original timestamp
         await updateRow(accessToken, editingRow.rowIndex, {
           fecha: editingRow.fecha, // Keep original timestamp when editing
-          cliente: clienteData.codigo, // Store cliente codigo
-          descripcion: productoData.codigo, // Store producto codigo
-          presentacion: productoCodigo, // Store presentacion codigo
-          tamano: tamanoCodigo, // Store tamano codigo
+          cliente: clienteData.correlativo, // Store cliente correlativo
+          descripcion: productoData.correlativo, // Store producto correlativo
+          presentacion: productoCorrelativo, // Store presentacion correlativo
+          tamano: tamanoCorrelativo, // Store tamano correlativo
           cantidad: parsedAmount
         });
         setStatus("Actualizado exitosamente.");
@@ -275,17 +275,17 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         setRuta("");
         setCliente("");
         setDescription("");
-        setProductoCodigo("");
-        setTamanoCodigo("");
+        setProductoCorrelativo("");
+        setTamanoCorrelativo("");
         setAmount("");
       } else {
         // Add new row - use timestamp for new entries
         await addEntryRow(accessToken, {
           fecha: timestamp, // Store timestamp instead of just date
-          cliente: clienteData.codigo, // Store cliente codigo
-          descripcion: productoData.codigo, // Store producto codigo
-          presentacion: productoCodigo, // Store presentacion codigo
-          tamano: tamanoCodigo, // Store tamano codigo
+          cliente: clienteData.correlativo, // Store cliente correlativo
+          descripcion: productoData.correlativo, // Store producto correlativo
+          presentacion: productoCorrelativo, // Store presentacion correlativo
+          tamano: tamanoCorrelativo, // Store tamano correlativo
           cantidad: parsedAmount
         });
         setAmount("");
@@ -306,8 +306,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     setRuta("");
     setCliente("");
     setDescription("");
-    setProductoCodigo("");
-    setTamanoCodigo("");
+    setProductoCorrelativo("");
+    setTamanoCorrelativo("");
     setAmount("");
     setStatus("");
   }
@@ -329,8 +329,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               setRuta("");
               setCliente("");
               setDescription("");
-              setProductoCodigo("");
-              setTamanoCodigo("");
+              setProductoCorrelativo("");
+              setTamanoCorrelativo("");
               setAmount("");
               setStatus("");
             }}
@@ -526,7 +526,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           )}
           <button
             type="submit"
-            disabled={saving || !date || !ruta || !cliente || !description || !productoCodigo || !tamanoCodigo || !amount}
+            disabled={saving || !date || !ruta || !cliente || !description || !productoCorrelativo || !tamanoCorrelativo || !amount}
             style={{
               flex: 1,
               padding: "1.25rem",
@@ -615,7 +615,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             }}>
               {activeModal === "ruta" && [...rutas].sort((a, b) => a.ruta.localeCompare(b.ruta)).map((r) => (
                 <button
-                  key={r.codigo}
+                  key={r.correlativo}
                   onClick={() => {
                     setRuta(r.ruta);
                     setCliente(""); // Reset cliente when ruta changes
@@ -667,8 +667,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                   key={desc}
                   onClick={() => {
                     setDescription(desc);
-                    setProductoCodigo(""); // Reset presentacion when producto changes
-                    setTamanoCodigo(""); // Reset tamano when producto changes
+                    setProductoCorrelativo(""); // Reset presentacion when producto changes
+                    setTamanoCorrelativo(""); // Reset tamano when producto changes
                     setActiveModal(null);
                   }}
                   style={{
@@ -690,9 +690,9 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               ))}
               {activeModal === "presentacion" && availablePresentaciones.map((p) => (
                 <button
-                  key={p.codigo}
+                  key={p.correlativo}
                   onClick={() => {
-                    setProductoCodigo(p.codigo);
+                    setProductoCorrelativo(p.correlativo);
                     setActiveModal(null);
                   }}
                   style={{
@@ -700,8 +700,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                     fontSize: "1.1rem",
                     fontWeight: "600",
                     border: "2px solid #ddd",
-                    backgroundColor: productoCodigo === p.codigo ? "#e3f2fd" : "white",
-                    borderColor: productoCodigo === p.codigo ? "#2196F3" : "#ddd",
+                    backgroundColor: productoCorrelativo === p.correlativo ? "#e3f2fd" : "white",
+                    borderColor: productoCorrelativo === p.correlativo ? "#2196F3" : "#ddd",
                     borderRadius: "8px",
                     cursor: "pointer",
                     minHeight: "70px",
@@ -714,9 +714,9 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               ))}
               {activeModal === "tamano" && availableTamanos.map((t) => (
                 <button
-                  key={t.codigo}
+                  key={t.correlativo}
                   onClick={() => {
-                    setTamanoCodigo(t.codigo);
+                    setTamanoCorrelativo(t.correlativo);
                     setActiveModal(null);
                   }}
                   style={{
@@ -724,8 +724,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                     fontSize: "1.1rem",
                     fontWeight: "600",
                     border: "2px solid #ddd",
-                    backgroundColor: tamanoCodigo === t.codigo ? "#e3f2fd" : "white",
-                    borderColor: tamanoCodigo === t.codigo ? "#2196F3" : "#ddd",
+                    backgroundColor: tamanoCorrelativo === t.correlativo ? "#e3f2fd" : "white",
+                    borderColor: tamanoCorrelativo === t.correlativo ? "#2196F3" : "#ddd",
                     borderRadius: "8px",
                     cursor: "pointer",
                     minHeight: "70px",
