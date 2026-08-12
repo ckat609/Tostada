@@ -3,10 +3,16 @@ import { useGoogleLogin, googleLogout } from "@react-oauth/google";
 import { appConfig, getConfigurationProblems } from "./config";
 import { EntryForm } from "./components/EntryForm";
 import { RecentRows } from "./components/RecentRows";
-import { getRecentRows, getRutas, getPresentaciones, getTamanos, getProductos, type RecentRow, type Ruta, type Presentacion, type Tamano, type Producto } from "./lib/graph";
+import { HamburgerMenu, VIEW_TITLES, type ViewKey } from "./components/HamburgerMenu";
+import { RutasView } from "./components/RutasView";
+import { ClientesView } from "./components/ClientesView";
+import { VendedoresView } from "./components/VendedoresView";
+import { CategoriasView } from "./components/CategoriasView";
+import { getRecentRows, getRutas, getPresentaciones, getTamanos, getProductos, getClientes, getVendedores, getCategorias, type RecentRow, type Ruta, type Presentacion, type Tamano, type Producto, type Cliente, type Vendedor, type Categoria } from "./lib/graph";
 import { GOOGLE_SCOPES } from "./auth";
 
 export default function App() {
+  const [view, setView] = useState<ViewKey>("ventas");
   const [accessToken, setAccessToken] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [rows, setRows] = useState<RecentRow[]>([]);
@@ -16,11 +22,38 @@ export default function App() {
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [tamanos, setTamanos] = useState<Tamano[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
+  const [editingRuta, setEditingRuta] = useState<Ruta | null>(null);
+  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [editingVendedor, setEditingVendedor] = useState<Vendedor | null>(null);
+  const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null);
   const configurationProblems = getConfigurationProblems();
 
   const handleEdit = (row: RecentRow) => {
     setEditingRow(row);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditRuta = (ruta: Ruta) => {
+    setEditingRuta(ruta);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditCliente = (cliente: Cliente) => {
+    setEditingCliente(cliente);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditVendedor = (vendedor: Vendedor) => {
+    setEditingVendedor(vendedor);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditCategoria = (categoria: Categoria) => {
+    setEditingCategoria(categoria);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -30,18 +63,24 @@ export default function App() {
     setLoadingRows(true);
     setRowError("");
     try {
-      const [rowsData, rutasData, presentacionesData, tamanosData, productosData] = await Promise.all([
+      const [rowsData, rutasData, presentacionesData, tamanosData, productosData, clientesData, vendedoresData, categoriasData] = await Promise.all([
         getRecentRows(accessToken),
         getRutas(accessToken),
         getPresentaciones(accessToken),
         getTamanos(accessToken),
-        getProductos(accessToken)
+        getProductos(accessToken),
+        getClientes(accessToken),
+        getVendedores(accessToken),
+        getCategorias(accessToken)
       ]);
       setRows(rowsData);
       setRutas(rutasData);
       setPresentaciones(presentacionesData);
       setTamanos(tamanosData);
       setProductos(productosData);
+      setClientes(clientesData);
+      setVendedores(vendedoresData);
+      setCategorias(categoriasData);
     } catch (error) {
       setRowError(error instanceof Error ? error.message : "Could not load spreadsheet rows.");
     } finally {
@@ -77,10 +116,12 @@ export default function App() {
 
   return (
     <main className="shell">
+      {isAuthenticated && <HamburgerMenu activeView={view} onSelect={setView} />}
+
       <header className="topbar">
-        <div>
-          <p className="eyebrow">La Nona</p>
-          <h1>Registro de Ventas</h1>
+        <div className="topbar-title">
+          <p className="eyebrow">La Noria</p>
+          <h1>{VIEW_TITLES[view]}</h1>
         </div>
 
         {isAuthenticated && (
@@ -126,22 +167,74 @@ export default function App() {
             </span>
           </section>
 
-          <div className="grid">
-            <EntryForm onSaved={refreshRows} accessToken={accessToken} editingRow={editingRow} onCancelEdit={() => setEditingRow(null)} />
-            <RecentRows
-              rows={rows}
+          {view === "ventas" && (
+            <div className="grid">
+              <EntryForm onSaved={refreshRows} accessToken={accessToken} editingRow={editingRow} onCancelEdit={() => setEditingRow(null)} />
+              <RecentRows
+                rows={rows}
+                rutas={rutas}
+                presentaciones={presentaciones}
+                tamanos={tamanos}
+                productos={productos}
+                loading={loadingRows}
+                error={rowError}
+                accessToken={accessToken}
+                onRefresh={refreshRows}
+                onEdit={handleEdit}
+                editingRow={editingRow}
+              />
+            </div>
+          )}
+          {view === "rutas" && (
+            <RutasView
+              accessToken={accessToken}
               rutas={rutas}
-              presentaciones={presentaciones}
-              tamanos={tamanos}
-              productos={productos}
               loading={loadingRows}
               error={rowError}
-              accessToken={accessToken}
               onRefresh={refreshRows}
-              onEdit={handleEdit}
-              editingRow={editingRow}
+              editingRuta={editingRuta}
+              onEdit={handleEditRuta}
+              onCancelEdit={() => setEditingRuta(null)}
             />
-          </div>
+          )}
+          {view === "clientes" && (
+            <ClientesView
+              accessToken={accessToken}
+              clientes={clientes}
+              rutas={rutas}
+              vendedores={vendedores}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingCliente={editingCliente}
+              onEdit={handleEditCliente}
+              onCancelEdit={() => setEditingCliente(null)}
+            />
+          )}
+          {view === "vendedores" && (
+            <VendedoresView
+              accessToken={accessToken}
+              vendedores={vendedores}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingVendedor={editingVendedor}
+              onEdit={handleEditVendedor}
+              onCancelEdit={() => setEditingVendedor(null)}
+            />
+          )}
+          {view === "categorias" && (
+            <CategoriasView
+              accessToken={accessToken}
+              categorias={categorias}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingCategoria={editingCategoria}
+              onEdit={handleEditCategoria}
+              onCancelEdit={() => setEditingCategoria(null)}
+            />
+          )}
         </>
       )}
     </main>
