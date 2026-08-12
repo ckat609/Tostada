@@ -123,7 +123,7 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
 
         // Look up human-readable values
         const rutaData = rutas.find(r => r.correlativo === row.ruta);
-        const productoData = productos.find(p => p.correlativo === row.descripcion);
+        const productoData = productos.find(p => p.correlativo === row.producto);
         const categoriaData = productoData ? categorias.find(c => c.correlativo === productoData.categoria) : null;
         const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
         const sabor = sabores.find(s => s.correlativo === row.sabor);
@@ -134,7 +134,7 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
           `"${rutaData?.ruta || row.ruta}"`,
           `"${row.cliente}"`,
           `"${categoriaData?.categoria || ""}"`,
-          `"${productoData?.descripcion || row.descripcion}"`,
+          `"${productoData?.descripcion || row.producto}"`,
           `"${presentacion?.presentacion || row.presentacion}"`,
           `"${sabor?.sabor || row.sabor || "—"}"`,
           row.cantidad,
@@ -431,19 +431,19 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                         {rutaGroup.items.map((row, index) => {
                           const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
                           const sabor = sabores.find(s => s.correlativo === row.sabor);
-                          const producto = productos.find(p => p.correlativo === row.descripcion);
+                          const producto = productos.find(p => p.correlativo === row.producto);
                           const isEditing = editingRow?.rowIndex === row.rowIndex;
                           // Convert UTC timestamp to Mexico Central Time (UTC-6)
                           const mexicoTime = toMexicoTime(row.fecha);
                           const timeOnly = mexicoTime ? mexicoTime.toISOString().substring(11, 16) : '';
                           return (
-                          <tr key={`${row.descripcion}-${index}`} style={{
+                          <tr key={`${row.producto}-${index}`} style={{
                             backgroundColor: isEditing ? "#fff9e6" : "transparent",
                             border: isEditing ? "2px solid #f0ad4e" : "none"
                           }}>
                             <td>{timeOnly}</td>
                             <td>{row.cliente}</td>
-                            <td>{producto?.descripcion || row.descripcion}</td>
+                            <td>{producto?.descripcion || row.producto}</td>
                             <td>{presentacion?.presentacion || row.presentacion}</td>
                             <td>{sabor?.sabor || row.sabor || "—"}</td>
                             <td>{row.cantidad}</td>
@@ -495,14 +495,14 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                     {rutaGroup.items.map((row, index) => {
                       const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
                       const sabor = sabores.find(s => s.correlativo === row.sabor);
-                      const producto = productos.find(p => p.correlativo === row.descripcion);
+                      const producto = productos.find(p => p.correlativo === row.producto);
                       const isEditing = editingRow?.rowIndex === row.rowIndex;
                       // Convert UTC timestamp to Mexico Central Time (UTC-6)
                       const mexicoTime = toMexicoTime(row.fecha);
                       const timeOnly = mexicoTime ? mexicoTime.toISOString().substring(11, 16) : '';
                       return (
                         <div
-                          key={`${row.descripcion}-${index}`}
+                          key={`${row.producto}-${index}`}
                           style={{
                             backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                             border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
@@ -520,7 +520,7 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                             </div>
                           </div>
                           <div style={{ display: "grid", gap: "0.25rem", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
-                            <div><span style={{ color: "#666" }}>Descripcion:</span> {producto?.descripcion || row.descripcion}</div>
+                            <div><span style={{ color: "#666" }}>Descripcion:</span> {producto?.descripcion || row.producto}</div>
                             <div><span style={{ color: "#666" }}>Presentacion:</span> {presentacion?.presentacion || row.presentacion}</div>
                             <div><span style={{ color: "#666" }}>Sabor:</span> {sabor?.sabor || row.sabor || "—"}</div>
                             <div><span style={{ color: "#666" }}>Cantidad:</span> {row.cantidad}</div>

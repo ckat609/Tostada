@@ -230,7 +230,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       const rutaData = rutas.find((r) => r.correlativo === editingRow.ruta);
 
       // Find producto name from correlativo
-      const productoData = productos.find((p) => p.correlativo === editingRow.descripcion);
+      const productoData = productos.find((p) => p.correlativo === editingRow.producto);
 
       setDate(editingRow.fecha);
       setRuta(rutaData?.ruta || "");
@@ -260,6 +260,13 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
 
     const precioTotal = parsedAmount * parsedPrecio;
 
+    // Find ruta correlativo from ruta name
+    const rutaData = rutas.find((r) => r.ruta === ruta);
+    if (!rutaData) {
+      setStatus("Ruta no encontrada.");
+      return;
+    }
+
     // Find cliente correlativo from cliente name
     const clienteData = clientes.find((c) => c.cliente === cliente);
     if (!clienteData) {
@@ -285,8 +292,9 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         // Update existing row - keep original timestamp
         await updateRow(accessToken, editingRow.rowIndex, {
           fecha: editingRow.fecha, // Keep original timestamp when editing
+          ruta: rutaData.correlativo, // Store ruta correlativo
           cliente: clienteData.correlativo, // Store cliente correlativo
-          descripcion: productoData.correlativo, // Store producto correlativo
+          producto: productoData.correlativo, // Store producto correlativo
           presentacion: productoCorrelativo, // Store presentacion correlativo
           sabor: saborCorrelativo, // Store sabor correlativo
           cantidad: parsedAmount,
@@ -307,8 +315,9 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         // Add new row - use timestamp for new entries
         await addEntryRow(accessToken, {
           fecha: timestamp, // Store timestamp instead of just date
+          ruta: rutaData.correlativo, // Store ruta correlativo
           cliente: clienteData.correlativo, // Store cliente correlativo
-          descripcion: productoData.correlativo, // Store producto correlativo
+          producto: productoData.correlativo, // Store producto correlativo
           presentacion: productoCorrelativo, // Store presentacion correlativo
           sabor: saborCorrelativo, // Store sabor correlativo
           cantidad: parsedAmount,

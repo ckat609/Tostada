@@ -10,7 +10,7 @@ interfaces.
 - **Mobile-First Design**: Large touch-friendly buttons and modal-based inputs, native device inputs for date, cantidad, and precio
 - **Pricing Tracking**: Automatic calculation of precio_total (cantidad × precio_unitario) for revenue tracking
 - **Auto-incrementing IDs**: Automatic `correlativo` generation for every new row, on every sheet
-- **Audit Trail**: `agregado`/`editado` timestamps recorded automatically on create/edit (all sheets except ventas)
+- **Audit Trail**: `agregado`/`editado` timestamps recorded automatically on create/edit on all sheets
 - **Smart Filtering**: View sales by today, week, month, or custom date range; filter productos by categoria
 - **Edit & Delete**: Modify or soft-delete entries directly from the interface (nothing is ever hard-deleted)
 - **Export Options**: Share or download sales data as CSV with categoria, precio unitario, and precio total columns
@@ -67,9 +67,9 @@ row is added through the app.
 
 ### Sheet: `ventas`
 
-Headers: `correlativo`, `fecha`, `ruta`, `cliente`, `descripcion`, `presentacion`, `sabor`, `cantidad`, `precio_unitario`, `precio_total`, `estado`
+Headers: `correlativo`, `fecha`, `ruta`, `cliente`, `producto`, `presentacion`, `sabor`, `cantidad`, `precio_unitario`, `precio_total`, `estado`, `agregado`, `editado`
 
-`ruta` stores the correlativo of a row in `rutas`; `cliente` stores the correlativo of the matching row in `clientes`; `descripcion` stores the correlativo of a row in `productos`; `presentacion` stores the correlativo of a row in `presentaciones`; `sabor` stores the correlativo of a row in `sabores`. `precio_total` is automatically calculated as `cantidad × precio_unitario`. `estado` is used for soft delete (set to `deleted`).
+`ruta` stores the correlativo of a row in `rutas`; `cliente` stores the correlativo of the matching row in `clientes`; `producto` stores the correlativo of a row in `productos`; `presentacion` stores the correlativo of a row in `presentaciones`; `sabor` stores the correlativo of a row in `sabores`. `precio_total` is automatically calculated as `cantidad × precio_unitario`. `agregado` is stamped when a row is created; `editado` is stamped on every create and edit. `estado` is used for soft delete (set to `deleted`).
 
 ### Sheet: `rutas`
 
@@ -147,7 +147,7 @@ Common free/cheap static hosts include Cloudflare Pages, Netlify, and Vercel. Th
 4. **Maintenance pages (Rutas / Clientes / Vendedores / Categorías / Presentaciones / Sabores)**: Each has its own "Agregar" form and "Libro de trabajo" list with a collapse arrow, inline edit, and delete. Clientes additionally has a Ruta dropdown and Código/Auxiliar fields, and its list filters by the ruta selected in the form.
 5. **Productos page**: Multi-select interface with categoria dropdown, and checkbox grids for presentaciones and sabores. At least one presentacion is required; sabores are optional.
 6. **Auto-increment**: The `correlativo` field auto-increments on every new row, on every sheet
-7. **Audit trail**: `agregado` is stamped when a row is created; `editado` is stamped on every create, edit, or delete (all sheets except ventas)
+7. **Audit trail**: `agregado` is stamped when a row is created; `editado` is stamped on every create, edit, or delete (all sheets)
 8. **View Sales**: Grouped by date and ruta with collapsible sections
 9. **Filtering**: Filter ventas by today, last week, last month, or custom range
 10. **Edit/Delete**: Click "Editar" or "Borrar" on any entry; deletes are soft (the `estado` column is set to `deleted`, nothing is removed from the sheet)
@@ -230,7 +230,7 @@ Edit `src/styles.css` to change the blue theme:
 
 Modify interfaces and header lookups in `src/lib/graph.ts`:
 
-- `EntryRow` / `RecentRow` - ventas (includes ruta, cliente, descripcion, presentacion, sabor, cantidad)
+- `EntryRow` / `RecentRow` - ventas (includes ruta, cliente, producto, presentacion, sabor, cantidad)
 - `Ruta`, `Cliente`, `Vendedor`, `Categoria`, `Presentacion`, `Sabor` - basic maintenance entities
 - `Producto` - supports multiple presentaciones and sabores via comma-separated correlativos
 - API functions use header-based column mapping (order-independent)
