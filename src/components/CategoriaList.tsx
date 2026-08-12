@@ -78,8 +78,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
               <thead>
                 <tr>
                   <th>Categoría</th>
-                  <th>Agregado</th>
-                  <th>Editado</th>
                   <th style={{ width: "140px" }}>Acciones</th>
                 </tr>
               </thead>
@@ -95,8 +93,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                       }}
                     >
                       <td>{c.categoria}</td>
-                      <td>{c.agregado}</td>
-                      <td>{c.editado}</td>
                       <td>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                           <button
@@ -109,7 +105,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                               border: "none",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontWeight: "600",
                               minWidth: "60px"
                             }}
                           >
@@ -125,7 +120,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                               border: "none",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontWeight: "600",
                               minWidth: "60px"
                             }}
                           >
@@ -154,9 +148,7 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                     marginBottom: "0.75rem"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.25rem" }}>{c.categoria}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#888", marginBottom: "0.25rem" }}>Agregado: {c.agregado || "—"}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#888", marginBottom: "0.75rem" }}>Editado: {c.editado || "—"}</div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.75rem" }}>{c.categoria}</div>
                   <div style={{ display: "flex", gap: "0.5rem" }}>
                     <button
                       onClick={() => onEdit(c)}
@@ -169,7 +161,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                         border: "none",
                         borderRadius: "6px",
                         cursor: "pointer",
-                        fontWeight: "600"
                       }}
                     >
                       Editar
@@ -185,7 +176,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                         border: "none",
                         borderRadius: "6px",
                         cursor: "pointer",
-                        fontWeight: "600"
                       }}
                     >
                       Borrar
@@ -244,7 +234,6 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
                   border: "none",
                   borderRadius: "4px",
                   cursor: "pointer",
-                  fontWeight: "600"
                 }}
               >
                 Eliminar

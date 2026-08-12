@@ -78,7 +78,7 @@ export interface EntryRow {
   cliente: string;
   descripcion: string;
   presentacion: string;
-  tamano: string;
+  sabor: string;
   cantidad: number;
   estado?: string;
 }
@@ -112,8 +112,8 @@ export async function addEntryRow(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
-  const tamanoIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "tamano"
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabor"
   );
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
@@ -145,7 +145,7 @@ export async function addEntryRow(
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
-  if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
+  if (saborIndex !== -1) row[saborIndex] = entry.sabor;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
   if (estadoIndex !== -1) row[estadoIndex] = entry.estado || ""; // Set estado if provided, otherwise empty
 
@@ -168,7 +168,7 @@ export interface RecentRow {
   cliente: string;
   descripcion: string;
   presentacion: string;
-  tamano: string;
+  sabor: string;
   cantidad: string;
   estado: string;
   rowIndex: number; // 1-based row index in the sheet
@@ -200,8 +200,8 @@ export async function getRecentRows(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
-  const tamanoIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "tamano"
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabor"
   );
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
@@ -222,7 +222,7 @@ export async function getRecentRows(
         cliente: clienteData?.cliente || clienteCorrelativo, // Display cliente name, fallback to correlativo
         descripcion: descripcionIndex !== -1 ? String(row[descripcionIndex] ?? "") : "",
         presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "") : "",
-        tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "") : "",
+        sabor: saborIndex !== -1 ? String(row[saborIndex] ?? "") : "",
         cantidad: cantidadIndex !== -1 ? String(row[cantidadIndex] ?? "") : "",
         estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "") : "",
         rowIndex: index + 2, // +2 because: +1 for slice(1), +1 for 1-based indexing
@@ -239,14 +239,35 @@ export async function getRecentRows(
 
 export interface Producto {
   correlativo: string;
-  descripcion: string;
-  presentacion: string; // Comma-separated list of presentacion correlativos
+  producto: string;
+  categoria: string; // categoria correlativo
+  presentaciones: string; // Comma-separated list of presentacion correlativos
+  sabores: string; // Comma-separated list of sabor correlativos
   tamano: string; // Comma-separated list of tamano correlativos
+  estado: string;
+  agregado: string;
+  editado: string;
+  rowIndex: number;
+  // Keep descripcion for backwards compatibility with ventas
+  descripcion: string;
 }
 
 export interface Presentacion {
   correlativo: string;
   presentacion: string;
+  estado: string;
+  agregado: string;
+  editado: string;
+  rowIndex: number;
+}
+
+export interface Sabor {
+  correlativo: string;
+  sabor: string;
+  estado: string;
+  agregado: string;
+  editado: string;
+  rowIndex: number;
 }
 
 export interface Tamano {
@@ -269,7 +290,6 @@ export interface Cliente {
   codigo: string;
   ruta: string;
   cliente: string;
-  vendedor: string;
   estado: string;
   agregado: string;
   editado: string;
@@ -308,25 +328,60 @@ export async function getProductos(
   const correlativoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "correlativo"
   );
-  const descripcionIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "descripcion"
+  const productoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "producto"
+  );
+  const categoriaIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "categoria"
   );
   const presentacionIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "presentacion"
+    (header) => String(header).toLowerCase() === "presentaciones"
+  );
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabores"
   );
   const tamanoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "tamano"
   );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  if (productoIndex === -1) {
+    return [];
+  }
 
   return allRows
     .slice(1)
-    .map(row => ({
-      correlativo: correlativoIndex !== -1 ? String(row[correlativoIndex] ?? "").trim() : "",
-      descripcion: descripcionIndex !== -1 ? String(row[descripcionIndex] ?? "").trim() : "",
-      presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "").trim() : "",
-      tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "").trim() : ""
-    }))
-    .filter(p => p.descripcion);
+    .map((row, index) => {
+      const productoValue = String(row[productoIndex] ?? "").trim();
+      return {
+        correlativo: String(row[correlativoIndex] ?? "").trim(),
+        producto: productoValue,
+        descripcion: productoValue, // For backwards compatibility with ventas
+        categoria: categoriaIndex !== -1 ? String(row[categoriaIndex] ?? "").trim() : "",
+        presentaciones: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "").trim() : "",
+        sabores: saborIndex !== -1 ? String(row[saborIndex] ?? "").trim() : "",
+        tamano: tamanoIndex !== -1 ? String(row[tamanoIndex] ?? "").trim() : "",
+        estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "").trim() : "",
+        agregado: agregadoIndex !== -1 ? String(row[agregadoIndex] ?? "").trim() : "",
+        editado: editadoIndex !== -1 ? String(row[editadoIndex] ?? "").trim() : "",
+        rowIndex: index + 2,
+      };
+    })
+    .filter(p => {
+      // Must have producto
+      if (!p.producto) return false;
+      // If estado column exists and is "deleted", exclude it
+      if (p.estado && p.estado.toLowerCase() === "deleted") return false;
+      return true;
+    });
 }
 
 export async function getPresentaciones(
@@ -346,14 +401,31 @@ export async function getPresentaciones(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  if (correlativoIndex === -1 || presentacionIndex === -1) {
+    return [];
+  }
 
   return allRows
     .slice(1)
-    .map(row => ({
-      correlativo: correlativoIndex !== -1 ? String(row[correlativoIndex] ?? "").trim() : "",
-      presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "").trim() : ""
+    .map((row, index) => ({
+      correlativo: String(row[correlativoIndex] ?? "").trim(),
+      presentacion: String(row[presentacionIndex] ?? "").trim(),
+      estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "").trim() : "",
+      agregado: agregadoIndex !== -1 ? String(row[agregadoIndex] ?? "").trim() : "",
+      editado: editadoIndex !== -1 ? String(row[editadoIndex] ?? "").trim() : "",
+      rowIndex: index + 2,
     }))
-    .filter(p => p.correlativo && p.presentacion);
+    .filter(p => p.correlativo && p.presentacion && p.estado.toLowerCase() !== "deleted");
 }
 
 export async function getTamanos(
@@ -565,9 +637,6 @@ export async function getClientes(
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
   );
-  const vendedorIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "vendedor"
-  );
   const estadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "estado"
   );
@@ -590,7 +659,6 @@ export async function getClientes(
       codigo: codigoIndex !== -1 ? String(row[codigoIndex] ?? "").trim() : "",
       ruta: rutaIndex !== -1 ? String(row[rutaIndex] ?? "").trim() : "",
       cliente: String(row[clienteIndex] ?? "").trim(),
-      vendedor: vendedorIndex !== -1 ? String(row[vendedorIndex] ?? "").trim() : "",
       estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "").trim() : "",
       agregado: agregadoIndex !== -1 ? String(row[agregadoIndex] ?? "").trim() : "",
       editado: editadoIndex !== -1 ? String(row[editadoIndex] ?? "").trim() : "",
@@ -604,7 +672,6 @@ export interface NewCliente {
   codigo: string;
   ruta: string; // Store ruta correlativo
   cliente: string;
-  vendedor: string; // Store vendedor correlativo
 }
 
 export async function addCliente(
@@ -634,9 +701,6 @@ export async function addCliente(
   );
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
-  );
-  const vendedorIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "vendedor"
   );
   const agregadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "agregado"
@@ -668,7 +732,6 @@ export async function addCliente(
   if (codigoIndex !== -1) row[codigoIndex] = entry.codigo;
   if (rutaIndex !== -1) row[rutaIndex] = entry.ruta;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
-  if (vendedorIndex !== -1) row[vendedorIndex] = entry.vendedor;
   if (agregadoIndex !== -1) row[agregadoIndex] = timestamp;
   if (editadoIndex !== -1) row[editadoIndex] = timestamp;
 
@@ -711,9 +774,6 @@ export async function updateCliente(
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
   );
-  const vendedorIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "vendedor"
-  );
   const editadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "editado"
   );
@@ -728,7 +788,6 @@ export async function updateCliente(
   if (codigoIndex !== -1) row[codigoIndex] = entry.codigo;
   if (rutaIndex !== -1) row[rutaIndex] = entry.ruta;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
-  if (vendedorIndex !== -1) row[vendedorIndex] = entry.vendedor;
   if (editadoIndex !== -1) row[editadoIndex] = currentTimestamp();
 
   const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
@@ -901,6 +960,398 @@ export async function deleteVendedor(
   rowIndex: number
 ): Promise<void> {
   await softDeleteRow(accessToken, "vendedores", rowIndex);
+}
+
+export interface NewPresentacion {
+  presentacion: string;
+}
+
+export async function addPresentacion(
+  accessToken: string,
+  entry: NewPresentacion
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "presentaciones";
+
+  const allRowsUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}`;
+  const allRowsResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, allRowsUrl);
+  const allRows = allRowsResponse.values ?? [];
+
+  const headers = allRows[0] ?? [];
+  const correlativoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "correlativo"
+  );
+  const presentacionIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "presentacion"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  let nextCorrelativo = 1;
+  if (correlativoIndex !== -1 && allRows.length > 1) {
+    const dataRows = allRows.slice(1);
+    const correlativos = dataRows
+      .map(row => {
+        const val = row[correlativoIndex];
+        return val ? parseInt(String(val)) : 0;
+      })
+      .filter(num => !isNaN(num));
+
+    if (correlativos.length > 0) {
+      nextCorrelativo = Math.max(...correlativos) + 1;
+    }
+  }
+
+  const timestamp = currentTimestamp();
+  const row = new Array(headers.length).fill("");
+  if (correlativoIndex !== -1) row[correlativoIndex] = nextCorrelativo;
+  if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
+  if (agregadoIndex !== -1) row[agregadoIndex] = timestamp;
+  if (editadoIndex !== -1) row[editadoIndex] = timestamp;
+
+  const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, appendUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function updatePresentacion(
+  accessToken: string,
+  rowIndex: number,
+  entry: NewPresentacion
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "presentaciones";
+
+  const headersUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
+  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, headersUrl);
+  const headers = headerResponse.values?.[0] ?? [];
+
+  const existingRowUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}:${rowIndex}`;
+  const existingRowResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, existingRowUrl);
+  const existingRow = existingRowResponse.values?.[0] ?? [];
+
+  const presentacionIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "presentacion"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  const row = [...existingRow];
+  while (row.length < headers.length) {
+    row.push("");
+  }
+
+  if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
+  if (editadoIndex !== -1) row[editadoIndex] = currentTimestamp();
+
+  const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, updateUrl, {
+    method: "PUT",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function deletePresentacion(
+  accessToken: string,
+  rowIndex: number
+): Promise<void> {
+  await softDeleteRow(accessToken, "presentaciones", rowIndex);
+}
+
+export interface NewSabor {
+  sabor: string;
+}
+
+export async function getSabores(
+  accessToken: string
+): Promise<Sabor[]> {
+  const { spreadsheetId } = appConfig.sheets;
+  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent("sabores")}`;
+  const response = await sheetsRequest<SheetsValuesResponse>(accessToken, url);
+
+  const allRows = response.values ?? [];
+  if (allRows.length === 0) return [];
+
+  const headers = allRows[0];
+  const correlativoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "correlativo"
+  );
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabor"
+  );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  if (correlativoIndex === -1 || saborIndex === -1) {
+    return [];
+  }
+
+  return allRows
+    .slice(1)
+    .map((row, index) => ({
+      correlativo: String(row[correlativoIndex] ?? "").trim(),
+      sabor: String(row[saborIndex] ?? "").trim(),
+      estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "").trim() : "",
+      agregado: agregadoIndex !== -1 ? String(row[agregadoIndex] ?? "").trim() : "",
+      editado: editadoIndex !== -1 ? String(row[editadoIndex] ?? "").trim() : "",
+      rowIndex: index + 2,
+    }))
+    .filter(s => s.correlativo && s.sabor && s.estado.toLowerCase() !== "deleted");
+}
+
+export async function addSabor(
+  accessToken: string,
+  entry: NewSabor
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "sabores";
+
+  const allRowsUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}`;
+  const allRowsResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, allRowsUrl);
+  const allRows = allRowsResponse.values ?? [];
+
+  const headers = allRows[0] ?? [];
+  const correlativoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "correlativo"
+  );
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabor"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  let nextCorrelativo = 1;
+  if (correlativoIndex !== -1 && allRows.length > 1) {
+    const dataRows = allRows.slice(1);
+    const correlativos = dataRows
+      .map(row => {
+        const val = row[correlativoIndex];
+        return val ? parseInt(String(val)) : 0;
+      })
+      .filter(num => !isNaN(num));
+
+    if (correlativos.length > 0) {
+      nextCorrelativo = Math.max(...correlativos) + 1;
+    }
+  }
+
+  const timestamp = currentTimestamp();
+  const row = new Array(headers.length).fill("");
+  if (correlativoIndex !== -1) row[correlativoIndex] = nextCorrelativo;
+  if (saborIndex !== -1) row[saborIndex] = entry.sabor;
+  if (agregadoIndex !== -1) row[agregadoIndex] = timestamp;
+  if (editadoIndex !== -1) row[editadoIndex] = timestamp;
+
+  const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, appendUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function updateSabor(
+  accessToken: string,
+  rowIndex: number,
+  entry: NewSabor
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "sabores";
+
+  const headersUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
+  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, headersUrl);
+  const headers = headerResponse.values?.[0] ?? [];
+
+  const existingRowUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}:${rowIndex}`;
+  const existingRowResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, existingRowUrl);
+  const existingRow = existingRowResponse.values?.[0] ?? [];
+
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabor"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  const row = [...existingRow];
+  while (row.length < headers.length) {
+    row.push("");
+  }
+
+  if (saborIndex !== -1) row[saborIndex] = entry.sabor;
+  if (editadoIndex !== -1) row[editadoIndex] = currentTimestamp();
+
+  const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, updateUrl, {
+    method: "PUT",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function deleteSabor(
+  accessToken: string,
+  rowIndex: number
+): Promise<void> {
+  await softDeleteRow(accessToken, "sabores", rowIndex);
+}
+
+export interface NewProducto {
+  producto: string;
+  categoria: string; // categoria correlativo
+  presentaciones: string[]; // Array of presentacion correlativos
+  sabores: string[]; // Array of sabor correlativos
+}
+
+export async function addProducto(
+  accessToken: string,
+  entry: NewProducto
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "productos";
+
+  const allRowsUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}`;
+  const allRowsResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, allRowsUrl);
+  const allRows = allRowsResponse.values ?? [];
+
+  const headers = allRows[0] ?? [];
+  const correlativoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "correlativo"
+  );
+  const productoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "producto"
+  );
+  const categoriaIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "categoria"
+  );
+  const presentacionIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "presentaciones"
+  );
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabores"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  let nextCorrelativo = 1;
+  if (correlativoIndex !== -1 && allRows.length > 1) {
+    const dataRows = allRows.slice(1);
+    const correlativos = dataRows
+      .map(row => {
+        const val = row[correlativoIndex];
+        return val ? parseInt(String(val)) : 0;
+      })
+      .filter(num => !isNaN(num));
+
+    if (correlativos.length > 0) {
+      nextCorrelativo = Math.max(...correlativos) + 1;
+    }
+  }
+
+  const timestamp = currentTimestamp();
+  const row = new Array(headers.length).fill("");
+  if (correlativoIndex !== -1) row[correlativoIndex] = nextCorrelativo;
+  if (productoIndex !== -1) row[productoIndex] = entry.producto;
+  if (categoriaIndex !== -1) row[categoriaIndex] = entry.categoria;
+  if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentaciones.join(",");
+  if (saborIndex !== -1) row[saborIndex] = entry.sabores.join(",");
+  if (agregadoIndex !== -1) row[agregadoIndex] = timestamp;
+  if (editadoIndex !== -1) row[editadoIndex] = timestamp;
+
+  const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, appendUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function updateProducto(
+  accessToken: string,
+  rowIndex: number,
+  entry: NewProducto
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "productos";
+
+  const headersUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
+  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, headersUrl);
+  const headers = headerResponse.values?.[0] ?? [];
+
+  const existingRowUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}:${rowIndex}`;
+  const existingRowResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, existingRowUrl);
+  const existingRow = existingRowResponse.values?.[0] ?? [];
+
+  const productoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "producto"
+  );
+  const categoriaIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "categoria"
+  );
+  const presentacionIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "presentaciones"
+  );
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabores"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  const row = [...existingRow];
+  while (row.length < headers.length) {
+    row.push("");
+  }
+
+  if (productoIndex !== -1) row[productoIndex] = entry.producto;
+  if (categoriaIndex !== -1) row[categoriaIndex] = entry.categoria;
+  if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentaciones.join(",");
+  if (saborIndex !== -1) row[saborIndex] = entry.sabores.join(",");
+  if (editadoIndex !== -1) row[editadoIndex] = currentTimestamp();
+
+  const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, updateUrl, {
+    method: "PUT",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function deleteProducto(
+  accessToken: string,
+  rowIndex: number
+): Promise<void> {
+  await softDeleteRow(accessToken, "productos", rowIndex);
 }
 
 export async function getCategorias(
@@ -1120,8 +1571,8 @@ export async function updateRow(
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
   );
-  const tamanoIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "tamano"
+  const saborIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "sabor"
   );
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
@@ -1142,7 +1593,7 @@ export async function updateRow(
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
-  if (tamanoIndex !== -1) row[tamanoIndex] = entry.tamano;
+  if (saborIndex !== -1) row[saborIndex] = entry.sabor;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
   if (estadoIndex !== -1 && entry.estado !== undefined) row[estadoIndex] = entry.estado;
 

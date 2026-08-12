@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Cliente, Ruta, Vendedor } from "../lib/graph";
+import type { Cliente, Ruta } from "../lib/graph";
 import { ClienteForm } from "./ClienteForm";
 import { ClienteList } from "./ClienteList";
 
@@ -7,7 +7,6 @@ interface ClientesViewProps {
   accessToken: string;
   clientes: Cliente[];
   rutas: Ruta[];
-  vendedores: Vendedor[];
   loading: boolean;
   error: string;
   onRefresh: () => void | Promise<void>;
@@ -16,7 +15,7 @@ interface ClientesViewProps {
   onCancelEdit: () => void;
 }
 
-export function ClientesView({ accessToken, clientes, rutas, vendedores, loading, error, onRefresh, editingCliente, onEdit, onCancelEdit }: ClientesViewProps) {
+export function ClientesView({ accessToken, clientes, rutas, loading, error, onRefresh, editingCliente, onEdit, onCancelEdit }: ClientesViewProps) {
   const [selectedRuta, setSelectedRuta] = useState("");
 
   return (
@@ -24,7 +23,6 @@ export function ClientesView({ accessToken, clientes, rutas, vendedores, loading
       <ClienteForm
         accessToken={accessToken}
         rutas={rutas}
-        vendedores={vendedores}
         onSaved={onRefresh}
         editingCliente={editingCliente}
         onCancelEdit={onCancelEdit}
@@ -33,7 +31,6 @@ export function ClientesView({ accessToken, clientes, rutas, vendedores, loading
       />
       <ClienteList
         clientes={clientes}
-        vendedores={vendedores}
         rutaFilter={selectedRuta}
         loading={loading}
         error={error}

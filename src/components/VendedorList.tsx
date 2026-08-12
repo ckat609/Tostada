@@ -78,8 +78,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
               <thead>
                 <tr>
                   <th>Vendedor</th>
-                  <th>Agregado</th>
-                  <th>Editado</th>
                   <th style={{ width: "140px" }}>Acciones</th>
                 </tr>
               </thead>
@@ -95,8 +93,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                       }}
                     >
                       <td>{v.vendedor}</td>
-                      <td>{v.agregado}</td>
-                      <td>{v.editado}</td>
                       <td>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                           <button
@@ -109,7 +105,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                               border: "none",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontWeight: "600",
                               minWidth: "60px"
                             }}
                           >
@@ -125,7 +120,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                               border: "none",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontWeight: "600",
                               minWidth: "60px"
                             }}
                           >
@@ -154,9 +148,7 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                     marginBottom: "0.75rem"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.25rem" }}>{v.vendedor}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#888", marginBottom: "0.25rem" }}>Agregado: {v.agregado || "—"}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#888", marginBottom: "0.75rem" }}>Editado: {v.editado || "—"}</div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.75rem" }}>{v.vendedor}</div>
                   <div style={{ display: "flex", gap: "0.5rem" }}>
                     <button
                       onClick={() => onEdit(v)}
@@ -169,7 +161,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                         border: "none",
                         borderRadius: "6px",
                         cursor: "pointer",
-                        fontWeight: "600"
                       }}
                     >
                       Editar
@@ -185,7 +176,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                         border: "none",
                         borderRadius: "6px",
                         cursor: "pointer",
-                        fontWeight: "600"
                       }}
                     >
                       Borrar
@@ -244,7 +234,6 @@ export function VendedorList({ vendedores, loading, error, accessToken, onRefres
                   border: "none",
                   borderRadius: "4px",
                   cursor: "pointer",
-                  fontWeight: "600"
                 }}
               >
                 Eliminar

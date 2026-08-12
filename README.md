@@ -6,15 +6,16 @@ interfaces.
 ## Features
 
 - **Google Sheets Integration**: Direct read/write access to your spreadsheet
-- **Multi-page Navigation**: Hamburger menu for switching between Registro de Ventas, Rutas, Clientes, Vendedores, and Categorías
-- **Mobile-First Design**: Large touch-friendly buttons and modal-based inputs
+- **Multi-page Navigation**: Hamburger menu for switching between Registro de Ventas, Rutas, Clientes, Vendedores, Categorías, Presentaciones, Sabores, and Productos
+- **Mobile-First Design**: Large touch-friendly buttons and modal-based inputs, native device inputs for date and quantity
 - **Auto-incrementing IDs**: Automatic `correlativo` generation for every new row, on every sheet
-- **Audit Trail**: `agregado`/`editado` timestamps recorded automatically on create/edit (rutas, clientes, vendedores, categorías)
-- **Smart Filtering**: View sales by today, week, month, or custom date range
+- **Audit Trail**: `agregado`/`editado` timestamps recorded automatically on create/edit (all sheets except ventas)
+- **Smart Filtering**: View sales by today, week, month, or custom date range; filter productos by categoria
 - **Edit & Delete**: Modify or soft-delete entries directly from the interface (nothing is ever hard-deleted)
-- **Export Options**: Share or download sales data as CSV
+- **Export Options**: Share or download sales data as CSV with categoria column
 - **Real-time Sync**: Changes reflect immediately in Google Sheets
-- **Multi-sheet Support**: Integrates with rutas, clientes, vendedores, categorías, and productos sheets
+- **Multi-sheet Support**: Integrates with rutas, clientes, vendedores, categorías, presentaciones, sabores, and productos sheets
+- **Multi-select Support**: Productos can have multiple presentaciones and sabores via checkbox interface
 - **Offline Capable**: PWA with service worker for offline functionality
 
 ## Tech Stack
@@ -65,10 +66,9 @@ row is added through the app.
 
 ### Sheet: `ventas`
 
-Headers: `correlativo`, `fecha`, `cliente`, `descripcion`, `presentacion`, `tamano`, `cantidad`, `estado`
+Headers: `correlativo`, `fecha`, `ruta`, `cliente`, `descripcion`, `presentacion`, `sabor`, `cantidad`, `estado`
 
-`cliente`, `descripcion`, `presentacion`, and `tamano` store the correlativo of the matching row in `clientes`, `productos`, `presentaciones`, and
-`tamanos` respectively. `estado` is used for soft delete (set to `deleted`).
+`ruta` stores the correlativo of a row in `rutas`; `cliente` stores the correlativo of the matching row in `clientes`; `descripcion` stores the correlativo of a row in `productos`; `presentacion` stores the correlativo of a row in `presentaciones`; `sabor` stores the correlativo of a row in `sabores`. `estado` is used for soft delete (set to `deleted`).
 
 ### Sheet: `rutas`
 
@@ -76,9 +76,9 @@ Headers: `correlativo`, `ruta`, `estado`, `agregado`, `editado`
 
 ### Sheet: `clientes`
 
-Headers: `correlativo`, `auxiliar`, `codigo`, `ruta`, `cliente`, `vendedor`, `estado`, `agregado`, `editado`
+Headers: `correlativo`, `auxiliar`, `codigo`, `ruta`, `cliente`, `estado`, `agregado`, `editado`
 
-`ruta` stores the correlativo of a row in `rutas`; `vendedor` stores the correlativo of a row in `vendedores`.
+`ruta` stores the correlativo of a row in `rutas`.
 
 ### Sheet: `vendedores`
 
@@ -90,16 +90,17 @@ Headers: `correlativo`, `categoria`, `estado`, `agregado`, `editado`
 
 ### Sheet: `productos`
 
-Headers: `correlativo`, `descripcion`, `presentacion` (comma-separated list of `presentaciones` correlativos), `tamano` (comma-separated list of
-`tamanos` correlativos)
+Headers: `correlativo`, `producto`, `categoria`, `presentaciones`, `sabores`, `estado`, `agregado`, `editado`
+
+`categoria` stores the correlativo of a row in `categorias`. `presentaciones` and `sabores` store comma-separated lists of correlativos from `presentaciones` and `sabores` sheets respectively.
 
 ### Sheet: `presentaciones`
 
-Headers: `correlativo`, `presentacion`
+Headers: `correlativo`, `presentacion`, `estado`, `agregado`, `editado`
 
-### Sheet: `tamanos`
+### Sheet: `sabores`
 
-Headers: `correlativo`, `tamano`
+Headers: `correlativo`, `sabor`, `estado`, `agregado`, `editado`
 
 ### Configuration
 
@@ -135,23 +136,21 @@ Common free/cheap static hosts include Cloudflare Pages, Netlify, and Vercel. Th
 ## How It Works
 
 1. **Authentication**: Users sign in with their Google account
-2. **Navigation**: A hamburger button (fixed top-right) opens a menu to switch between Registro de Ventas, Rutas, Clientes, Vendedores, and Categorías
-3. **Data Entry (Registro de Ventas)**: Touch-friendly modal interface for selecting:
-   - Date (custom calendar picker)
-   - Ruta → Cliente (cascading selection)
-   - Producto → Presentación / Tamaño (cascading selection)
-   - Cantidad (custom number pad)
-4. **Maintenance pages (Rutas / Clientes / Vendedores / Categorías)**: Each has its own "Agregar" form and "Libro de trabajo" list with a collapse
-   arrow, inline edit, and delete. Clientes additionally has a Ruta/Vendedor dropdown and Código/Auxiliar fields, and its list filters by the ruta
-   selected in the form.
-5. **Auto-increment**: The `correlativo` field auto-increments on every new row, on every sheet
-6. **Audit trail**: `agregado` is stamped when a row is created; `editado` is stamped on every create, edit, or delete (rutas, clientes, vendedores,
-   categorías — not ventas)
-7. **View Sales**: Grouped by date and ruta with collapsible sections
-8. **Filtering**: Filter by today, last week, last month, or custom range
-9. **Edit/Delete**: Click "Editar" or "Borrar" on any entry; deletes are soft (the `estado` column is set to `deleted`, nothing is removed from the
-   sheet)
-10. **Export**: Share via native share sheet or download as CSV (ventas only)
+2. **Navigation**: A hamburger button (fixed top-right) opens a menu to switch between Registro de Ventas, Rutas, Clientes, Vendedores, Categorías, Presentaciones, Sabores, and Productos
+3. **Data Entry (Registro de Ventas)**: Touch-friendly interface for selecting:
+   - Date (native device date picker)
+   - Ruta → Cliente (cascading modal selection)
+   - Categoría (optional filter) → Producto (modal selection)
+   - Presentación / Sabor (cascading modal selection, sabor only shown if producto has sabores)
+   - Cantidad (native number input)
+4. **Maintenance pages (Rutas / Clientes / Vendedores / Categorías / Presentaciones / Sabores)**: Each has its own "Agregar" form and "Libro de trabajo" list with a collapse arrow, inline edit, and delete. Clientes additionally has a Ruta dropdown and Código/Auxiliar fields, and its list filters by the ruta selected in the form.
+5. **Productos page**: Multi-select interface with categoria dropdown, and checkbox grids for presentaciones and sabores. At least one presentacion is required; sabores are optional.
+6. **Auto-increment**: The `correlativo` field auto-increments on every new row, on every sheet
+7. **Audit trail**: `agregado` is stamped when a row is created; `editado` is stamped on every create, edit, or delete (all sheets except ventas)
+8. **View Sales**: Grouped by date and ruta with collapsible sections
+9. **Filtering**: Filter ventas by today, last week, last month, or custom range
+10. **Edit/Delete**: Click "Editar" or "Borrar" on any entry; deletes are soft (the `estado` column is set to `deleted`, nothing is removed from the sheet)
+11. **Export**: Share via native share sheet or download as CSV with categoria column included (ventas only)
 
 ## Project Structure
 
@@ -160,11 +159,14 @@ src/
 ├── components/
 │   ├── EntryForm.tsx        # Mobile-friendly sales entry form
 │   ├── RecentRows.tsx       # Sales list with filtering and export
-│   ├── HamburgerMenu.tsx    # Top-right nav menu (Ventas/Rutas/Clientes/Vendedores/Categorías)
+│   ├── HamburgerMenu.tsx    # Top-right nav menu (Ventas/Rutas/Clientes/Vendedores/Categorías/Presentaciones/Sabores/Productos)
 │   ├── RutaForm.tsx / RutaList.tsx / RutasView.tsx
 │   ├── ClienteForm.tsx / ClienteList.tsx / ClientesView.tsx
 │   ├── VendedorForm.tsx / VendedorList.tsx / VendedoresView.tsx
-│   └── CategoriaForm.tsx / CategoriaList.tsx / CategoriasView.tsx
+│   ├── CategoriaForm.tsx / CategoriaList.tsx / CategoriasView.tsx
+│   ├── PresentacionForm.tsx / PresentacionList.tsx / PresentacionesView.tsx
+│   ├── SaborForm.tsx / SaborList.tsx / SaboresView.tsx
+│   └── ProductoForm.tsx / ProductoList.tsx / ProductosView.tsx
 ├── lib/
 │   └── graph.ts             # Google Sheets API integration
 ├── config.ts                # Environment configuration
@@ -177,20 +179,24 @@ src/
 
 ### Mobile-First UI
 
-- All input fields open as full-screen modals with large tap targets (70px minimum height)
-- Custom number pad for quantity input
-- Custom calendar picker with large day buttons
-- Modal-based selection for all dropdowns in Registro de Ventas
+- Modal-based selection for ruta, cliente, categoria, producto, presentacion, and sabor in Registro de Ventas
+- Native device inputs for date and cantidad (better UX on mobile)
+- Large tap targets (56px minimum height) throughout
+- Two-column layout maintained on all screen sizes for paired fields
+- Checkbox grids with visual feedback for multi-select (productos page)
 
 ### Navigation
 
 - A fixed hamburger button in the top-right corner slides down a menu with all pages
 - The header title updates to match the active page
+- Logout button integrated into account info bar
 
 ### Smart Data Management
 
 - Cascading selections: Choose ruta first, then see only relevant clientes
-- Choose producto first, then see only its presentaciones/tamaños
+- Optional categoria filter narrows down producto selection
+- Choose producto first, then see only its presentaciones and sabores
+- Productos support multiple presentaciones and sabores via comma-separated correlativos
 - Auto-incrementing correlativo prevents duplicate IDs on every sheet
 - Case-insensitive, order-independent column header matching for flexibility
 
@@ -222,10 +228,11 @@ Edit `src/styles.css` to change the blue theme:
 
 Modify interfaces and header lookups in `src/lib/graph.ts`:
 
-- `EntryRow` / `RecentRow` - ventas
-- `Ruta`, `Cliente`, `Vendedor`, `Categoria` - maintenance sheets
-- `Producto`, `Presentacion`, `Tamano` - product lookups
+- `EntryRow` / `RecentRow` - ventas (includes ruta, cliente, descripcion, presentacion, sabor, cantidad)
+- `Ruta`, `Cliente`, `Vendedor`, `Categoria`, `Presentacion`, `Sabor` - basic maintenance entities
+- `Producto` - supports multiple presentaciones and sabores via comma-separated correlativos
 - API functions use header-based column mapping (order-independent)
+- Multi-value fields (presentaciones, sabores in productos) stored as comma-separated strings
 
 ### Language
 

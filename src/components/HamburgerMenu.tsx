@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export type ViewKey = "ventas" | "rutas" | "clientes" | "vendedores" | "categorias";
+export type ViewKey = "ventas" | "rutas" | "clientes" | "vendedores" | "categorias" | "presentaciones" | "sabores" | "productos";
 
 export const VIEW_TITLES: Record<ViewKey, string> = {
   ventas: "Registro de Ventas",
@@ -8,9 +8,12 @@ export const VIEW_TITLES: Record<ViewKey, string> = {
   clientes: "Clientes",
   vendedores: "Vendedores",
   categorias: "Categorías",
+  presentaciones: "Presentaciones",
+  sabores: "Sabores",
+  productos: "Productos",
 };
 
-const MENU_ITEMS: ViewKey[] = ["ventas", "rutas", "clientes", "vendedores", "categorias"];
+const MENU_ITEMS: ViewKey[] = ["ventas", "rutas", "clientes", "vendedores", "categorias", "presentaciones", "sabores", "productos"];
 
 export function HamburgerMenu({ activeView, onSelect }: { activeView: ViewKey; onSelect: (view: ViewKey) => void }) {
   const [open, setOpen] = useState(false);
