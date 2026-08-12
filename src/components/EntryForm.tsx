@@ -19,6 +19,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [productoCorrelativo, setProductoCorrelativo] = useState(""); // Store the presentacion correlativo
   const [saborCorrelativo, setSaborCorrelativo] = useState(""); // Store the sabor correlativo
   const [amount, setAmount] = useState("");
+  const [precio, setPrecio] = useState("");
   const [status, setStatus] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -238,6 +239,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       setProductoCorrelativo(editingRow.presentacion);
       setSaborCorrelativo(editingRow.sabor);
       setAmount(editingRow.cantidad);
+      setPrecio(editingRow.precio_unitario);
     }
   }, [editingRow, productos, rutas, presentaciones, sabores]);
 
@@ -250,10 +252,13 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
 
     const parsedAmount = Number(amount);
-    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const parsedPrecio = Number(precio);
+    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !precio || !Number.isFinite(parsedPrecio) || parsedPrecio <= 0) {
       setStatus("Por favor completa todos los campos requeridos.");
       return;
     }
+
+    const precioTotal = parsedAmount * parsedPrecio;
 
     // Find cliente correlativo from cliente name
     const clienteData = clientes.find((c) => c.cliente === cliente);
@@ -285,6 +290,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           presentacion: productoCorrelativo, // Store presentacion correlativo
           sabor: saborCorrelativo, // Store sabor correlativo
           cantidad: parsedAmount,
+          precio_unitario: parsedPrecio,
+          precio_total: precioTotal,
         });
         setStatus("Actualizado exitosamente.");
         onCancelEdit();
@@ -305,8 +312,11 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           presentacion: productoCorrelativo, // Store presentacion correlativo
           sabor: saborCorrelativo, // Store sabor correlativo
           cantidad: parsedAmount,
+          precio_unitario: parsedPrecio,
+          precio_total: precioTotal,
         });
         setAmount("");
+        setPrecio("");
         setStatus("Guardado exitosamente.");
       }
       await onSaved();
@@ -550,26 +560,49 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           </button>
         </div>
 
-        <input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Cantidad"
-          min="1"
-          step="1"
-          style={{
-            width: "100%",
-            padding: "1rem",
-            fontSize: "1.1rem",
-            minHeight: "56px",
-            borderRadius: "8px",
-            border: "2px solid #ddd",
-            backgroundColor: amount ? "#2196F3" : "#888",
-            color: "white",
-            WebkitTextFillColor: "white",
-            textAlign: "left",
-          }}
-        />
+        <div className="two-col-grid-always">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Cantidad"
+            min="1"
+            step="1"
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "1.1rem",
+              minHeight: "56px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: amount ? "#2196F3" : "#888",
+              color: "white",
+              WebkitTextFillColor: "white",
+              textAlign: "left",
+            }}
+          />
+
+          <input
+            type="number"
+            value={precio}
+            onChange={(e) => setPrecio(e.target.value)}
+            placeholder="Precio"
+            min="0.01"
+            step="0.01"
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "1.1rem",
+              minHeight: "56px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: precio ? "#2196F3" : "#888",
+              color: "white",
+              WebkitTextFillColor: "white",
+              textAlign: "left",
+            }}
+          />
+        </div>
 
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
           {editingRow && (
