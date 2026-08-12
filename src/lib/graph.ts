@@ -75,8 +75,9 @@ async function softDeleteRow(
 
 export interface EntryRow {
   fecha: string;
+  ruta: string;
   cliente: string;
-  descripcion: string;
+  producto: string;
   presentacion: string;
   sabor: string;
   cantidad: number;
@@ -105,11 +106,14 @@ export async function addEntryRow(
   const fechaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "fecha"
   );
+  const rutaIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "ruta"
+  );
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
   );
-  const descripcionIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "descripcion"
+  const productoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "producto"
   );
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
@@ -125,6 +129,12 @@ export async function addEntryRow(
   );
   const precioTotalIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "precio_total"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
   );
   const estadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "estado"
@@ -146,17 +156,22 @@ export async function addEntryRow(
     }
   }
 
+  const timestamp = currentTimestamp();
+
   // Build row array matching the actual column order
   const row = new Array(headers.length).fill("");
   if (correlativoIndex !== -1) row[correlativoIndex] = nextCorrelativo;
   if (fechaIndex !== -1) row[fechaIndex] = entry.fecha;
+  if (rutaIndex !== -1) row[rutaIndex] = entry.ruta;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
-  if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
+  if (productoIndex !== -1) row[productoIndex] = entry.producto;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (saborIndex !== -1) row[saborIndex] = entry.sabor;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
   if (precioUnitarioIndex !== -1) row[precioUnitarioIndex] = entry.precio_unitario;
   if (precioTotalIndex !== -1) row[precioTotalIndex] = entry.precio_total;
+  if (agregadoIndex !== -1) row[agregadoIndex] = timestamp;
+  if (editadoIndex !== -1) row[editadoIndex] = timestamp;
   if (estadoIndex !== -1) row[estadoIndex] = entry.estado || ""; // Set estado if provided, otherwise empty
 
   const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
@@ -176,7 +191,7 @@ export interface RecentRow {
   fecha: string;
   ruta: string;
   cliente: string;
-  descripcion: string;
+  producto: string;
   presentacion: string;
   sabor: string;
   cantidad: string;
@@ -206,8 +221,8 @@ export async function getRecentRows(
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
   );
-  const descripcionIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "descripcion"
+  const productoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "producto"
   );
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
@@ -238,7 +253,7 @@ export async function getRecentRows(
         fecha: fechaIndex !== -1 ? String(row[fechaIndex] ?? "") : "",
         ruta: clienteData?.ruta || "",
         cliente: clienteData?.cliente || clienteCorrelativo, // Display cliente name, fallback to correlativo
-        descripcion: descripcionIndex !== -1 ? String(row[descripcionIndex] ?? "") : "",
+        producto: productoIndex !== -1 ? String(row[productoIndex] ?? "") : "",
         presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "") : "",
         sabor: saborIndex !== -1 ? String(row[saborIndex] ?? "") : "",
         cantidad: cantidadIndex !== -1 ? String(row[cantidadIndex] ?? "") : "",
@@ -1582,11 +1597,14 @@ export async function updateRow(
   const fechaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "fecha"
   );
+  const rutaIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "ruta"
+  );
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
   );
-  const descripcionIndex = headers.findIndex(
-    (header) => String(header).toLowerCase() === "descripcion"
+  const productoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "producto"
   );
   const presentacionIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "presentacion"
@@ -1603,9 +1621,17 @@ export async function updateRow(
   const precioTotalIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "precio_total"
   );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
   const estadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "estado"
   );
+
+  const timestamp = currentTimestamp();
 
   // Start with existing row to preserve all fields (like correlativo)
   const row = [...existingRow];
@@ -1616,13 +1642,15 @@ export async function updateRow(
 
   // Update only the fields we're changing
   if (fechaIndex !== -1) row[fechaIndex] = entry.fecha;
+  if (rutaIndex !== -1) row[rutaIndex] = entry.ruta;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
-  if (descripcionIndex !== -1) row[descripcionIndex] = entry.descripcion;
+  if (productoIndex !== -1) row[productoIndex] = entry.producto;
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (saborIndex !== -1) row[saborIndex] = entry.sabor;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
   if (precioUnitarioIndex !== -1) row[precioUnitarioIndex] = entry.precio_unitario;
   if (precioTotalIndex !== -1) row[precioTotalIndex] = entry.precio_total;
+  if (editadoIndex !== -1) row[editadoIndex] = timestamp;
   if (estadoIndex !== -1 && entry.estado !== undefined) row[estadoIndex] = entry.estado;
 
   const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
