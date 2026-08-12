@@ -105,7 +105,7 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
   const generateCSV = () => {
     if (filteredRows.length === 0) return null;
 
-    const headers = ["Fecha", "Hora", "Ruta", "Cliente", "Categoria", "Descripcion", "Presentacion", "Sabor", "Cantidad"];
+    const headers = ["Fecha", "Hora", "Ruta", "Cliente", "Categoria", "Descripcion", "Presentacion", "Sabor", "Cantidad", "Precio Unitario", "Precio Total"];
     const csvRows = [
       headers.join(","),
       ...filteredRows.map(row => {
@@ -137,7 +137,9 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
           `"${productoData?.descripcion || row.descripcion}"`,
           `"${presentacion?.presentacion || row.presentacion}"`,
           `"${sabor?.sabor || row.sabor || "—"}"`,
-          row.cantidad
+          row.cantidad,
+          row.precio_unitario,
+          row.precio_total
         ].join(",");
       })
     ];
@@ -420,6 +422,8 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                           <th>Presentacion</th>
                           <th>Sabor</th>
                           <th>Cantidad</th>
+                          <th>Unitario</th>
+                          <th>Total</th>
                           <th style={{ width: "140px" }}>Acciones</th>
                         </tr>
                       </thead>
@@ -443,6 +447,8 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                             <td>{presentacion?.presentacion || row.presentacion}</td>
                             <td>{sabor?.sabor || row.sabor || "—"}</td>
                             <td>{row.cantidad}</td>
+                            <td>Q{row.precio_unitario || "—"}</td>
+                            <td>Q{row.precio_total || "—"}</td>
                             <td>
                               <div style={{ display: "flex", gap: "0.5rem" }}>
                                 <button
@@ -518,6 +524,8 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                             <div><span style={{ color: "#666" }}>Presentacion:</span> {presentacion?.presentacion || row.presentacion}</div>
                             <div><span style={{ color: "#666" }}>Sabor:</span> {sabor?.sabor || row.sabor || "—"}</div>
                             <div><span style={{ color: "#666" }}>Cantidad:</span> {row.cantidad}</div>
+                            <div><span style={{ color: "#666" }}>Unitario:</span> Q{row.precio_unitario || "—"}</div>
+                            <div><span style={{ color: "#666" }}>Total:</span> Q{row.precio_total || "—"}</div>
                           </div>
                           <div style={{ display: "flex", gap: "0.5rem" }}>
                             <button

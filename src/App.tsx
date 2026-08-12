@@ -152,12 +152,14 @@ export default function App() {
     <main className="shell">
       {isAuthenticated && <HamburgerMenu activeView={view} onSelect={setView} />}
 
-      <header className="topbar">
-        <div className="topbar-title">
-          <p className="eyebrow">La Noria</p>
-          <h1>{VIEW_TITLES[view]}</h1>
-        </div>
-      </header>
+      {isAuthenticated && (
+        <header className="topbar">
+          <div className="topbar-title">
+            <p className="eyebrow">La Noria</p>
+            <h1>{VIEW_TITLES[view]}</h1>
+          </div>
+        </header>
+      )}
 
       {configurationProblems.length > 0 && (
         <section className="card warning">
@@ -174,12 +176,20 @@ export default function App() {
       )}
 
       {!isAuthenticated && (
-        <section className="hero card">
-          <div>
-            <p className="eyebrow">Un solo inicio de sesión</p>
-            <h2>Usa la misma app en tu teléfono, tableta y computadora.</h2>
-            <p className="muted">Los datos se escriben directamente en la hoja de Google configurada.</p>
-          </div>
+        <section className="card" style={{
+          maxWidth: "500px",
+          margin: "4rem auto",
+          textAlign: "center",
+          padding: "3rem 2rem"
+        }}>
+          <h1 style={{
+            color: "#2196F3",
+            fontSize: "3rem",
+            marginBottom: "2rem",
+            fontWeight: "700"
+          }}>
+            La Noria
+          </h1>
           <button onClick={() => login()} disabled={configurationProblems.length > 0}>
             Iniciar sesión con Google
           </button>

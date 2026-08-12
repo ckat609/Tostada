@@ -80,6 +80,8 @@ export interface EntryRow {
   presentacion: string;
   sabor: string;
   cantidad: number;
+  precio_unitario: number;
+  precio_total: number;
   estado?: string;
 }
 
@@ -118,6 +120,12 @@ export async function addEntryRow(
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
+  const precioUnitarioIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "precio_unitario"
+  );
+  const precioTotalIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "precio_total"
+  );
   const estadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "estado"
   );
@@ -147,6 +155,8 @@ export async function addEntryRow(
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (saborIndex !== -1) row[saborIndex] = entry.sabor;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
+  if (precioUnitarioIndex !== -1) row[precioUnitarioIndex] = entry.precio_unitario;
+  if (precioTotalIndex !== -1) row[precioTotalIndex] = entry.precio_total;
   if (estadoIndex !== -1) row[estadoIndex] = entry.estado || ""; // Set estado if provided, otherwise empty
 
   const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
@@ -170,6 +180,8 @@ export interface RecentRow {
   presentacion: string;
   sabor: string;
   cantidad: string;
+  precio_unitario: string;
+  precio_total: string;
   estado: string;
   rowIndex: number; // 1-based row index in the sheet
 }
@@ -206,6 +218,12 @@ export async function getRecentRows(
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
+  const precioUnitarioIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "precio_unitario"
+  );
+  const precioTotalIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "precio_total"
+  );
   const estadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "estado"
   );
@@ -224,6 +242,8 @@ export async function getRecentRows(
         presentacion: presentacionIndex !== -1 ? String(row[presentacionIndex] ?? "") : "",
         sabor: saborIndex !== -1 ? String(row[saborIndex] ?? "") : "",
         cantidad: cantidadIndex !== -1 ? String(row[cantidadIndex] ?? "") : "",
+        precio_unitario: precioUnitarioIndex !== -1 ? String(row[precioUnitarioIndex] ?? "") : "",
+        precio_total: precioTotalIndex !== -1 ? String(row[precioTotalIndex] ?? "") : "",
         estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "") : "",
         rowIndex: index + 2, // +2 because: +1 for slice(1), +1 for 1-based indexing
       };
@@ -1577,6 +1597,12 @@ export async function updateRow(
   const cantidadIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cantidad"
   );
+  const precioUnitarioIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "precio_unitario"
+  );
+  const precioTotalIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "precio_total"
+  );
   const estadoIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "estado"
   );
@@ -1595,6 +1621,8 @@ export async function updateRow(
   if (presentacionIndex !== -1) row[presentacionIndex] = entry.presentacion;
   if (saborIndex !== -1) row[saborIndex] = entry.sabor;
   if (cantidadIndex !== -1) row[cantidadIndex] = entry.cantidad;
+  if (precioUnitarioIndex !== -1) row[precioUnitarioIndex] = entry.precio_unitario;
+  if (precioTotalIndex !== -1) row[precioTotalIndex] = entry.precio_total;
   if (estadoIndex !== -1 && entry.estado !== undefined) row[estadoIndex] = entry.estado;
 
   const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
