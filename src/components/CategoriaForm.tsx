@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { addCategoria, updateCategoria, type Categoria } from "../lib/graph";
 
 interface CategoriaFormProps {
@@ -12,6 +13,12 @@ export function CategoriaForm({ accessToken, onSaved, editingCategoria, onCancel
   const [categoria, setCategoria] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
 
   useEffect(() => {
     if (editingCategoria) {
@@ -48,12 +55,12 @@ export function CategoriaForm({ accessToken, onSaved, editingCategoria, onCancel
     try {
       if (editingCategoria) {
         await updateCategoria(accessToken, editingCategoria.rowIndex, { categoria: categoria.trim() });
-        setStatus("Actualizado exitosamente.");
+        triggerFlash("Categoría actualizada");
         onCancelEdit();
         resetForm();
       } else {
         await addCategoria(accessToken, { categoria: categoria.trim() });
-        setStatus("Guardado exitosamente.");
+        triggerFlash("Categoría registrada");
         resetForm();
       }
       await onSaved();
@@ -65,6 +72,7 @@ export function CategoriaForm({ accessToken, onSaved, editingCategoria, onCancel
   }
 
   return (
+    <>
     <form
       className="card form"
       onSubmit={handleSubmit}
@@ -77,15 +85,24 @@ export function CategoriaForm({ accessToken, onSaved, editingCategoria, onCancel
         <h2>{editingCategoria ? "Editar categoría" : "Agregar categoría"}</h2>
       </div>
 
-      <label>
-        Categoría
-        <input
-          type="text"
-          value={categoria}
-          onChange={(event) => setCategoria(event.target.value)}
-          placeholder="Nombre de la categoría"
-        />
-      </label>
+      <input
+        type="text"
+        value={categoria}
+        onChange={(event) => setCategoria(event.target.value)}
+        placeholder="Nombre de la categoría"
+        style={{
+          width: "100%",
+          padding: "1rem",
+          fontSize: "0.88rem",
+          minHeight: "72px",
+          borderRadius: "8px",
+          border: "2px solid #ddd",
+          backgroundColor: categoria ? "#2196F3" : "#888",
+          color: "white",
+          WebkitTextFillColor: "white",
+          textAlign: "left",
+        }}
+      />
 
       <div style={{ display: "flex", gap: "0.5rem" }}>
         {editingCategoria && (
@@ -100,5 +117,16 @@ export function CategoriaForm({ accessToken, onSaved, editingCategoria, onCancel
 
       {status && <p className="status" role="status">{status}</p>}
     </form>
+
+    {flash &&
+      createPortal(
+        <div className="venta-toast-wrap">
+          <div key={flash.key} className="venta-toast">
+            {flash.text}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }

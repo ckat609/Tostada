@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { addPresentacion, updatePresentacion, type Presentacion } from "../lib/graph";
 
 interface PresentacionFormProps {
@@ -12,6 +13,12 @@ export function PresentacionForm({ accessToken, onSaved, editingPresentacion, on
   const [presentacion, setPresentacion] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
 
   useEffect(() => {
     if (editingPresentacion) {
@@ -48,12 +55,12 @@ export function PresentacionForm({ accessToken, onSaved, editingPresentacion, on
     try {
       if (editingPresentacion) {
         await updatePresentacion(accessToken, editingPresentacion.rowIndex, { presentacion: presentacion.trim() });
-        setStatus("Actualizado exitosamente.");
+        triggerFlash("Presentación actualizada");
         onCancelEdit();
         resetForm();
       } else {
         await addPresentacion(accessToken, { presentacion: presentacion.trim() });
-        setStatus("Guardado exitosamente.");
+        triggerFlash("Presentación registrada");
         resetForm();
       }
       await onSaved();
@@ -65,6 +72,7 @@ export function PresentacionForm({ accessToken, onSaved, editingPresentacion, on
   }
 
   return (
+    <>
     <form
       className="card form"
       onSubmit={handleSubmit}
@@ -77,15 +85,24 @@ export function PresentacionForm({ accessToken, onSaved, editingPresentacion, on
         <h2>{editingPresentacion ? "Editar presentación" : "Agregar presentación"}</h2>
       </div>
 
-      <label>
-        Presentación
-        <input
-          type="text"
-          value={presentacion}
-          onChange={(event) => setPresentacion(event.target.value)}
-          placeholder="Nombre de la presentación"
-        />
-      </label>
+      <input
+        type="text"
+        value={presentacion}
+        onChange={(event) => setPresentacion(event.target.value)}
+        placeholder="Nombre de la presentación"
+        style={{
+          width: "100%",
+          padding: "1rem",
+          fontSize: "0.88rem",
+          minHeight: "72px",
+          borderRadius: "8px",
+          border: "2px solid #ddd",
+          backgroundColor: presentacion ? "#2196F3" : "#888",
+          color: "white",
+          WebkitTextFillColor: "white",
+          textAlign: "left",
+        }}
+      />
 
       <div style={{ display: "flex", gap: "0.5rem" }}>
         {editingPresentacion && (
@@ -100,5 +117,16 @@ export function PresentacionForm({ accessToken, onSaved, editingPresentacion, on
 
       {status && <p className="status" role="status">{status}</p>}
     </form>
+
+    {flash &&
+      createPortal(
+        <div className="venta-toast-wrap">
+          <div key={flash.key} className="venta-toast">
+            {flash.text}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }

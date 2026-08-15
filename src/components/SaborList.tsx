@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Sabor } from "../lib/graph";
 import { deleteSabor } from "../lib/graph";
 
@@ -15,6 +16,28 @@ interface SaborListProps {
 export function SaborList({ sabores, loading, error, accessToken, onRefresh, onEdit, editingSabor }: SaborListProps) {
   const [deletingSabor, setDeletingSabor] = useState<Sabor | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+  const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
+  // Collapse the expanded row's buttons when tapping anything that isn't a row item
+  useEffect(() => {
+    if (expandedRowIndex === null) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-recent-row-item]")) {
+        setExpandedRowIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [expandedRowIndex]);
 
   const sortedSabores = [...sabores].sort((a, b) => a.sabor.localeCompare(b.sabor));
 
@@ -24,6 +47,7 @@ export function SaborList({ sabores, loading, error, accessToken, onRefresh, onE
     try {
       await deleteSabor(accessToken, deletingSabor.rowIndex);
       setDeletingSabor(null);
+      triggerFlash("Sabor eliminado");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -137,50 +161,56 @@ export function SaborList({ sabores, loading, error, accessToken, onRefresh, onE
           <div className="mobile-only">
             {sortedSabores.map((s) => {
               const isEditing = editingSabor?.rowIndex === s.rowIndex;
+              const isExpanded = expandedRowIndex === s.rowIndex;
               return (
                 <div
                   key={s.rowIndex}
+                  data-recent-row-item
+                  onClick={() => setExpandedRowIndex(isExpanded ? null : s.rowIndex)}
                   style={{
                     backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                     border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
                     borderRadius: "8px",
                     padding: "1rem",
-                    marginBottom: "0.75rem"
+                    marginBottom: "0.75rem",
+                    cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.75rem" }}>{s.sabor}</div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      onClick={() => onEdit(s)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#2196F3",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => setDeletingSabor(s)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Borrar
-                    </button>
-                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: isExpanded ? "0.75rem" : 0 }}>{s.sabor}</div>
+                  {isExpanded && (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(s); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#2196F3",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeletingSabor(s); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -242,6 +272,16 @@ export function SaborList({ sabores, loading, error, accessToken, onRefresh, onE
           </div>
         </div>
       )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

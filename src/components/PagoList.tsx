@@ -1,23 +1,20 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import type { Producto, Categoria, Sabor, Presentacion } from "../lib/graph";
-import { deleteProducto } from "../lib/graph";
+import type { Pago } from "../lib/graph";
+import { deletePago } from "../lib/graph";
 
-interface ProductoListProps {
-  productos: Producto[];
-  categorias: Categoria[];
-  sabores: Sabor[];
-  presentaciones: Presentacion[];
+interface PagoListProps {
+  pagos: Pago[];
   loading: boolean;
   error: string;
   accessToken: string;
   onRefresh: () => void | Promise<void>;
-  onEdit: (producto: Producto) => void;
-  editingProducto: Producto | null;
+  onEdit: (pago: Pago) => void;
+  editingPago: Pago | null;
 }
 
-export function ProductoList({ productos, categorias, sabores, presentaciones, loading, error, accessToken, onRefresh, onEdit, editingProducto }: ProductoListProps) {
-  const [deletingProducto, setDeletingProducto] = useState<Producto | null>(null);
+export function PagoList({ pagos, loading, error, accessToken, onRefresh, onEdit, editingPago }: PagoListProps) {
+  const [deletingPago, setDeletingPago] = useState<Pago | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
   const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
@@ -42,43 +39,15 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [expandedRowIndex]);
 
-  const sortedProductos = [...productos].sort((a, b) => a.producto.localeCompare(b.producto));
-
-  const categoriaLista = (correlativo: string): string[] => {
-    if (!correlativo) return [];
-    return [categorias.find(c => c.correlativo === correlativo)?.categoria || correlativo];
-  };
-  const saboresLista = (correlativos: string): string[] => {
-    if (!correlativos || !correlativos.trim()) return [];
-    return correlativos.split(",").map(c => {
-      const trimmed = c.trim();
-      return sabores.find(s => s.correlativo === trimmed)?.sabor || trimmed;
-    }).filter(Boolean);
-  };
-  const presentacionesLista = (correlativos: string): string[] => {
-    if (!correlativos || !correlativos.trim()) return [];
-    return correlativos.split(",").map(c => {
-      const trimmed = c.trim();
-      return presentaciones.find(p => p.correlativo === trimmed)?.presentacion || trimmed;
-    }).filter(Boolean);
-  };
-
-  function BulletList({ items }: { items: string[] }) {
-    if (items.length === 0) return <>—</>;
-    return (
-      <ul style={{ margin: 0, paddingLeft: "2.25rem" }}>
-        {items.map((item, i) => <li key={i}>{item}</li>)}
-      </ul>
-    );
-  }
+  const sortedPagos = [...pagos].sort((a, b) => a.pago.localeCompare(b.pago));
 
   const confirmDelete = async () => {
-    if (!deletingProducto) return;
+    if (!deletingPago) return;
 
     try {
-      await deleteProducto(accessToken, deletingProducto.rowIndex);
-      setDeletingProducto(null);
-      triggerFlash("Producto eliminado");
+      await deletePago(accessToken, deletingPago.rowIndex);
+      setDeletingPago(null);
+      triggerFlash("Forma de pago eliminada");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -90,7 +59,7 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
       <div className="section-heading" style={{ marginBottom: isCollapsed ? 0 : "1.5rem" }}>
         <div>
           <p className="eyebrow">Libro de trabajo</p>
-          <h2>Productos</h2>
+          <h2>Formas de pago</h2>
         </div>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -120,28 +89,25 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
         opacity: isCollapsed ? 0 : 1
       }}>
 
-      {loading && <p className="muted">Cargando productos…</p>}
+      {loading && <p className="muted">Cargando formas de pago…</p>}
       {error && <p className="status error">{error}</p>}
-      {!loading && !error && sortedProductos.length === 0 && (
-        <p className="muted">No hay productos aún.</p>
+      {!loading && !error && sortedPagos.length === 0 && (
+        <p className="muted">No hay formas de pago aún.</p>
       )}
 
-      {sortedProductos.length > 0 && (
+      {sortedPagos.length > 0 && (
         <>
           <div className="table-wrap desktop-only">
             <table>
               <thead>
                 <tr>
-                  <th>Producto</th>
-                  <th>Categoría</th>
-                  <th>Presentaciones</th>
-                  <th>Sabores</th>
+                  <th>Forma de pago</th>
                   <th style={{ width: "140px" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedProductos.map((p) => {
-                  const isEditing = editingProducto?.rowIndex === p.rowIndex;
+                {sortedPagos.map((p) => {
+                  const isEditing = editingPago?.rowIndex === p.rowIndex;
                   return (
                     <tr
                       key={p.rowIndex}
@@ -150,10 +116,7 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
                         border: isEditing ? "2px solid #f0ad4e" : "none"
                       }}
                     >
-                      <td>{p.producto}</td>
-                      <td><BulletList items={categoriaLista(p.categoria)} /></td>
-                      <td><BulletList items={presentacionesLista(p.presentaciones)} /></td>
-                      <td><BulletList items={saboresLista(p.sabores)} /></td>
+                      <td>{p.pago}</td>
                       <td>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                           <button
@@ -172,7 +135,7 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
                             Editar
                           </button>
                           <button
-                            onClick={() => setDeletingProducto(p)}
+                            onClick={() => setDeletingPago(p)}
                             style={{
                               padding: "0.5rem 0.75rem",
                               fontSize: "0.9rem",
@@ -196,8 +159,8 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
           </div>
 
           <div className="mobile-only">
-            {sortedProductos.map((p) => {
-              const isEditing = editingProducto?.rowIndex === p.rowIndex;
+            {sortedPagos.map((p) => {
+              const isEditing = editingPago?.rowIndex === p.rowIndex;
               const isExpanded = expandedRowIndex === p.rowIndex;
               return (
                 <div
@@ -213,49 +176,40 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
                     cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.25rem" }}>{p.producto}</div>
-                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>
-                    Categoría: <BulletList items={categoriaLista(p.categoria)} />
-                  </div>
-                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>
-                    Presentaciones: <BulletList items={presentacionesLista(p.presentaciones)} />
-                  </div>
-                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: isExpanded ? "0.75rem" : 0 }}>
-                    Sabores: <BulletList items={saboresLista(p.sabores)} />
-                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: isExpanded ? "0.75rem" : 0 }}>{p.pago}</div>
                   {isExpanded && (
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onEdit(p); }}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#2196F3",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeletingProducto(p); }}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Borrar
-                    </button>
-                  </div>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#2196F3",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeletingPago(p); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Borrar
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -265,7 +219,7 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
       )}
       </div>
 
-      {deletingProducto && (
+      {deletingPago && (
         <div style={{
           position: "fixed",
           top: 0,
@@ -289,7 +243,7 @@ export function ProductoList({ productos, categorias, sabores, presentaciones, l
             <p style={{ marginBottom: "1.5rem" }}>Esta acción no se puede deshacer.</p>
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
               <button
-                onClick={() => setDeletingProducto(null)}
+                onClick={() => setDeletingPago(null)}
                 style={{
                   padding: "0.5rem 1rem",
                   backgroundColor: "#6c757d",

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Categoria } from "../lib/graph";
 import { deleteCategoria } from "../lib/graph";
 
@@ -15,6 +16,28 @@ interface CategoriaListProps {
 export function CategoriaList({ categorias, loading, error, accessToken, onRefresh, onEdit, editingCategoria }: CategoriaListProps) {
   const [deletingCategoria, setDeletingCategoria] = useState<Categoria | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+  const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
+  // Collapse the expanded row's buttons when tapping anything that isn't a row item
+  useEffect(() => {
+    if (expandedRowIndex === null) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-recent-row-item]")) {
+        setExpandedRowIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [expandedRowIndex]);
 
   const sortedCategorias = [...categorias].sort((a, b) => a.categoria.localeCompare(b.categoria));
 
@@ -24,6 +47,7 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
     try {
       await deleteCategoria(accessToken, deletingCategoria.rowIndex);
       setDeletingCategoria(null);
+      triggerFlash("Categoría eliminada");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -137,50 +161,56 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
           <div className="mobile-only">
             {sortedCategorias.map((c) => {
               const isEditing = editingCategoria?.rowIndex === c.rowIndex;
+              const isExpanded = expandedRowIndex === c.rowIndex;
               return (
                 <div
                   key={c.rowIndex}
+                  data-recent-row-item
+                  onClick={() => setExpandedRowIndex(isExpanded ? null : c.rowIndex)}
                   style={{
                     backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                     border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
                     borderRadius: "8px",
                     padding: "1rem",
-                    marginBottom: "0.75rem"
+                    marginBottom: "0.75rem",
+                    cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.75rem" }}>{c.categoria}</div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      onClick={() => onEdit(c)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#2196F3",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => setDeletingCategoria(c)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Borrar
-                    </button>
-                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: isExpanded ? "0.75rem" : 0 }}>{c.categoria}</div>
+                  {isExpanded && (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(c); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#2196F3",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeletingCategoria(c); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -242,6 +272,16 @@ export function CategoriaList({ categorias, loading, error, accessToken, onRefre
           </div>
         </div>
       )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

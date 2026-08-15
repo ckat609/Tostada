@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { addSabor, updateSabor, type Sabor } from "../lib/graph";
 
 interface SaborFormProps {
@@ -12,6 +13,12 @@ export function SaborForm({ accessToken, onSaved, editingSabor, onCancelEdit }: 
   const [sabor, setSabor] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
 
   useEffect(() => {
     if (editingSabor) {
@@ -48,12 +55,12 @@ export function SaborForm({ accessToken, onSaved, editingSabor, onCancelEdit }: 
     try {
       if (editingSabor) {
         await updateSabor(accessToken, editingSabor.rowIndex, { sabor: sabor.trim() });
-        setStatus("Actualizado exitosamente.");
+        triggerFlash("Sabor actualizado");
         onCancelEdit();
         resetForm();
       } else {
         await addSabor(accessToken, { sabor: sabor.trim() });
-        setStatus("Guardado exitosamente.");
+        triggerFlash("Sabor registrado");
         resetForm();
       }
       await onSaved();
@@ -65,6 +72,7 @@ export function SaborForm({ accessToken, onSaved, editingSabor, onCancelEdit }: 
   }
 
   return (
+    <>
     <form
       className="card form"
       onSubmit={handleSubmit}
@@ -77,15 +85,24 @@ export function SaborForm({ accessToken, onSaved, editingSabor, onCancelEdit }: 
         <h2>{editingSabor ? "Editar sabor" : "Agregar sabor"}</h2>
       </div>
 
-      <label>
-        Sabor
-        <input
-          type="text"
-          value={sabor}
-          onChange={(event) => setSabor(event.target.value)}
-          placeholder="Nombre del sabor"
-        />
-      </label>
+      <input
+        type="text"
+        value={sabor}
+        onChange={(event) => setSabor(event.target.value)}
+        placeholder="Nombre del sabor"
+        style={{
+          width: "100%",
+          padding: "1rem",
+          fontSize: "0.88rem",
+          minHeight: "72px",
+          borderRadius: "8px",
+          border: "2px solid #ddd",
+          backgroundColor: sabor ? "#2196F3" : "#888",
+          color: "white",
+          WebkitTextFillColor: "white",
+          textAlign: "left",
+        }}
+      />
 
       <div style={{ display: "flex", gap: "0.5rem" }}>
         {editingSabor && (
@@ -100,5 +117,16 @@ export function SaborForm({ accessToken, onSaved, editingSabor, onCancelEdit }: 
 
       {status && <p className="status" role="status">{status}</p>}
     </form>
+
+    {flash &&
+      createPortal(
+        <div className="venta-toast-wrap">
+          <div key={flash.key} className="venta-toast">
+            {flash.text}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }

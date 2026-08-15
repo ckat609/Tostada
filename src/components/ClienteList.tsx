@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Cliente } from "../lib/graph";
 import { deleteCliente } from "../lib/graph";
 
@@ -16,6 +17,28 @@ interface ClienteListProps {
 export function ClienteList({ clientes, rutaFilter, loading, error, accessToken, onRefresh, onEdit, editingCliente }: ClienteListProps) {
   const [deletingCliente, setDeletingCliente] = useState<Cliente | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+  const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
+  // Collapse the expanded row's buttons when tapping anything that isn't a row item
+  useEffect(() => {
+    if (expandedRowIndex === null) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-recent-row-item]")) {
+        setExpandedRowIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [expandedRowIndex]);
 
   const filteredClientes = rutaFilter
     ? clientes.filter(c => c.ruta === rutaFilter).sort((a, b) => a.cliente.localeCompare(b.cliente))
@@ -27,6 +50,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
     try {
       await deleteCliente(accessToken, deletingCliente.rowIndex);
       setDeletingCliente(null);
+      triggerFlash("Cliente eliminado");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -147,23 +171,28 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
           <div className="mobile-only">
             {filteredClientes.map((c) => {
               const isEditing = editingCliente?.rowIndex === c.rowIndex;
+              const isExpanded = expandedRowIndex === c.rowIndex;
               return (
                 <div
                   key={c.rowIndex}
+                  data-recent-row-item
+                  onClick={() => setExpandedRowIndex(isExpanded ? null : c.rowIndex)}
                   style={{
                     backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                     border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
                     borderRadius: "8px",
                     padding: "1rem",
-                    marginBottom: "0.75rem"
+                    marginBottom: "0.75rem",
+                    cursor: "pointer"
                   }}
                 >
                   <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.25rem" }}>{c.cliente}</div>
                   <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>Auxiliar: {c.auxiliar}</div>
-                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.75rem" }}>Código: {c.codigo}</div>
+                  <div style={{ fontSize: "0.9rem", color: "#666", marginBottom: isExpanded ? "0.75rem" : 0 }}>Código: {c.codigo}</div>
+                  {isExpanded && (
                   <div style={{ display: "flex", gap: "0.5rem" }}>
                     <button
-                      onClick={() => onEdit(c)}
+                      onClick={(e) => { e.stopPropagation(); onEdit(c); }}
                       style={{
                         flex: 1,
                         padding: "0.75rem",
@@ -178,7 +207,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
                       Editar
                     </button>
                     <button
-                      onClick={() => setDeletingCliente(c)}
+                      onClick={(e) => { e.stopPropagation(); setDeletingCliente(c); }}
                       style={{
                         flex: 1,
                         padding: "0.75rem",
@@ -193,6 +222,7 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
                       Borrar
                     </button>
                   </div>
+                  )}
                 </div>
               );
             })}
@@ -254,6 +284,16 @@ export function ClienteList({ clientes, rutaFilter, loading, error, accessToken,
           </div>
         </div>
       )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

@@ -1,6 +1,7 @@
-import { useState } from "react";
-import type { RecentRow, Ruta, Presentacion, Sabor, Producto, Categoria } from "../lib/graph";
-import { deleteRow } from "../lib/graph";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import type { RecentRow, Ruta, Presentacion, Sabor, Producto, Categoria, Pago, Cliente } from "../lib/graph";
+import { deleteRow, formatCurrency } from "../lib/graph";
 
 interface RecentRowsProps {
   rows: RecentRow[];
@@ -9,12 +10,16 @@ interface RecentRowsProps {
   sabores: Sabor[];
   productos: Producto[];
   categorias: Categoria[];
+  pagos: Pago[];
+  clientes: Cliente[];
   loading: boolean;
   error: string;
   accessToken: string;
   onRefresh: () => void;
   onEdit: (row: RecentRow) => void;
   editingRow: RecentRow | null;
+  recentlyEditedRowIndex: number | null;
+  recentlyEditedPreviousKey: string | null;
 }
 
 type DateFilter = "today" | "week" | "month" | "range";
@@ -34,12 +39,55 @@ function toMexicoTime(fecha: string): Date | null {
   return new Date(utcMs - 6 * 60 * 60 * 1000);
 }
 
-export function RecentRows({ rows, rutas, presentaciones, sabores, productos, categorias, loading, error, accessToken, onRefresh, onEdit, editingRow }: RecentRowsProps) {
+export function RecentRows({ rows, rutas, presentaciones, sabores, productos, categorias, pagos, clientes, loading, error, accessToken, onRefresh, onEdit, editingRow, recentlyEditedRowIndex, recentlyEditedPreviousKey }: RecentRowsProps) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deletingRowIndex, setDeletingRowIndex] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+  const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
+  const startDateInputRef = useRef<HTMLInputElement | null>(null);
+  const endDateInputRef = useRef<HTMLInputElement | null>(null);
+
+  function openDatePicker(ref: React.RefObject<HTMLInputElement | null>) {
+    const el = ref.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (!el) return;
+    if (typeof el.showPicker === "function") {
+      el.showPicker();
+    } else {
+      el.focus();
+    }
+  }
+
+  // Collapse the expanded row's buttons when tapping anything that isn't a row item
+  useEffect(() => {
+    if (expandedRowIndex === null) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-recent-row-item]")) {
+        setExpandedRowIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [expandedRowIndex]);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
+  // Formats a "YYYY-MM-DD" string as "DD/MM/YYYY", independent of browser locale
+  function formatShortDate(dateStr: string) {
+    const date = new Date(dateStr + 'T00:00:00');
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
 
   // Filter rows by date
   const getFilteredRows = () => {
@@ -92,6 +140,7 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
     try {
       await deleteRow(accessToken, deletingRowIndex);
       setDeletingRowIndex(null);
+      triggerFlash("Venta eliminada");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -335,29 +384,61 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
 
         {dateFilter === "range" && (
           <>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              style={{
-                padding: "0.5rem",
+            <div style={{ position: "relative", cursor: "pointer" }} onClick={() => openDatePicker(startDateInputRef)}>
+              <div style={{
+                padding: "0.9rem 1.1rem",
                 border: "1px solid #ccc",
-                borderRadius: "4px"
-              }}
-              placeholder="Fecha inicial"
-            />
+                borderRadius: "4px",
+                backgroundColor: "white",
+                minWidth: "11rem",
+                fontSize: "1.15rem",
+                color: startDate ? "#333" : "#888"
+              }}>
+                {startDate ? formatShortDate(startDate) : "Fecha inicial"}
+              </div>
+              <input
+                ref={startDateInputRef}
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  opacity: 0,
+                  cursor: "pointer",
+                  width: "100%",
+                  height: "100%"
+                }}
+              />
+            </div>
             <span>a</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                padding: "0.5rem",
+            <div style={{ position: "relative", cursor: "pointer" }} onClick={() => openDatePicker(endDateInputRef)}>
+              <div style={{
+                padding: "0.9rem 1.1rem",
                 border: "1px solid #ccc",
-                borderRadius: "4px"
-              }}
-              placeholder="Fecha final"
-            />
+                borderRadius: "4px",
+                backgroundColor: "white",
+                minWidth: "11rem",
+                fontSize: "1.15rem",
+                color: endDate ? "#333" : "#888"
+              }}>
+                {endDate ? formatShortDate(endDate) : "Fecha final"}
+              </div>
+              <input
+                ref={endDateInputRef}
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  opacity: 0,
+                  cursor: "pointer",
+                  width: "100%",
+                  height: "100%"
+                }}
+              />
+            </div>
           </>
         )}
       </div>
@@ -373,6 +454,35 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
 
       {filteredRows.length > 0 && (
         <div>
+          {groupedByFecha.length > 1 && (() => {
+            const allDates = filteredRows.map(row => row.fecha.split(' ')[0]).sort();
+            const earliestDate = allDates[0];
+            const latestDate = allDates[allDates.length - 1];
+
+            return (
+              <div style={{
+                padding: "1rem 1.5rem",
+                backgroundColor: "#2196F3",
+                color: "white",
+                borderRadius: "6px",
+                marginBottom: "1.5rem",
+                fontSize: "1.2rem",
+                letterSpacing: "0.5px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "1rem"
+              }}>
+                <div>
+                  <div>Total</div>
+                  <div style={{ fontSize: "0.6em" }}>({formatShortDate(earliestDate)} - {formatShortDate(latestDate)})</div>
+                </div>
+                <span style={{ fontWeight: 700 }}>
+                  {formatCurrency(filteredRows.reduce((sum, row) => sum + (Number(row.precio_total) || 0), 0))}
+                </span>
+              </div>
+            );
+          })()}
           {groupedByFecha.map((fechaGroup, fechaIndex) => {
             const formatFecha = (dateStr: string) => {
               const date = new Date(dateStr + 'T00:00:00');
@@ -383,6 +493,11 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
               return `${dayName} ${day}/${month}/${year}`;
             };
 
+            const fechaTotal = fechaGroup.rutas.reduce(
+              (sum, r) => sum + r.items.reduce((s, row) => s + (Number(row.precio_total) || 0), 0),
+              0
+            );
+
             return (
               <div key={`fecha-${fechaGroup.fecha}-${fechaIndex}`} style={{ marginBottom: "3rem" }}>
                 <div style={{
@@ -392,10 +507,14 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                   borderRadius: "6px",
                   marginBottom: "1.5rem",
                   fontSize: "1.2rem",
-                  textTransform: "capitalize",
-                  letterSpacing: "0.5px"
+                  letterSpacing: "0.5px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "1rem"
                 }}>
-                  {formatFecha(fechaGroup.fecha)}
+                  <span style={{ textTransform: "capitalize" }}>{formatFecha(fechaGroup.fecha)}</span>
+                  <span style={{ fontWeight: 700 }}>{formatCurrency(fechaTotal)}</span>
                 </div>
               {fechaGroup.rutas.map((rutaGroup, rutaIndex) => (
                 <div key={`ruta-${rutaGroup.ruta}-${rutaIndex}`} className="ruta-group">
@@ -403,7 +522,7 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                     <div style={{
                       padding: "0.6rem 1rem",
                       backgroundColor: "#f5f5f5",
-                      borderLeft: "4px solid #666",
+                      borderLeft: "12px solid #2196F3",
                       marginBottom: "0.75rem",
                       fontSize: "0.95rem",
                       color: "#333"
@@ -411,158 +530,130 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
                       {rutas.find(r => r.correlativo === rutaGroup.ruta)?.ruta || rutaGroup.ruta}
                     </div>
                   )}
-                  {/* Desktop: Table view */}
-                  <div className="table-wrap desktop-only">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Hora</th>
-                          <th>Cliente</th>
-                          <th>Descripcion</th>
-                          <th>Presentacion</th>
-                          <th>Sabor</th>
-                          <th>Cantidad</th>
-                          <th>Unitario</th>
-                          <th>Total</th>
-                          <th style={{ width: "140px" }}>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rutaGroup.items.map((row, index) => {
-                          const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
-                          const sabor = sabores.find(s => s.correlativo === row.sabor);
-                          const producto = productos.find(p => p.correlativo === row.producto);
-                          const isEditing = editingRow?.rowIndex === row.rowIndex;
-                          // Convert UTC timestamp to Mexico Central Time (UTC-6)
-                          const mexicoTime = toMexicoTime(row.fecha);
-                          const timeOnly = mexicoTime ? mexicoTime.toISOString().substring(11, 16) : '';
-                          return (
-                          <tr key={`${row.producto}-${index}`} style={{
-                            backgroundColor: isEditing ? "#fff9e6" : "transparent",
-                            border: isEditing ? "2px solid #f0ad4e" : "none"
-                          }}>
-                            <td>{timeOnly}</td>
-                            <td>{row.cliente}</td>
-                            <td>{producto?.descripcion || row.producto}</td>
-                            <td>{presentacion?.presentacion || row.presentacion}</td>
-                            <td>{sabor?.sabor || row.sabor || "—"}</td>
-                            <td>{row.cantidad}</td>
-                            <td>Q{row.precio_unitario || "—"}</td>
-                            <td>Q{row.precio_total || "—"}</td>
-                            <td>
-                              <div style={{ display: "flex", gap: "0.5rem" }}>
-                                <button
-                                  onClick={() => onEdit(row)}
-                                  style={{
-                                    padding: "0.5rem 0.75rem",
-                                    fontSize: "0.9rem",
-                                    backgroundColor: "#2196F3",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    minWidth: "60px"
-                                  }}
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(row)}
-                                  style={{
-                                    padding: "0.5rem 0.75rem",
-                                    fontSize: "0.9rem",
-                                    backgroundColor: "#dc3545",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    minWidth: "60px"
-                                  }}
-                                >
-                                  Borrar
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  {(() => {
+                    const clienteGroups: { cliente: string; codigo: string; items: RecentRow[] }[] = [];
+                    rutaGroup.items.forEach((row) => {
+                      let group = clienteGroups.find(g => g.cliente === row.cliente && g.codigo === row.codigo);
+                      if (!group) {
+                        group = { cliente: row.cliente, codigo: row.codigo, items: [] };
+                        clienteGroups.push(group);
+                      }
+                      group.items.push(row);
+                    });
 
-                  {/* Mobile: Card view */}
-                  <div className="mobile-only">
-                    {rutaGroup.items.map((row, index) => {
-                      const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
-                      const sabor = sabores.find(s => s.correlativo === row.sabor);
-                      const producto = productos.find(p => p.correlativo === row.producto);
-                      const isEditing = editingRow?.rowIndex === row.rowIndex;
-                      // Convert UTC timestamp to Mexico Central Time (UTC-6)
-                      const mexicoTime = toMexicoTime(row.fecha);
-                      const timeOnly = mexicoTime ? mexicoTime.toISOString().substring(11, 16) : '';
+                    return clienteGroups.map((clienteGroup, clienteIndex) => {
+                      const total = clienteGroup.items.reduce((sum, row) => sum + (Number(row.precio_total) || 0), 0);
+                      const auxiliar = clientes.find(c => c.cliente === clienteGroup.cliente)?.auxiliar;
+                      const groupKey = `${clienteGroup.cliente}||${clienteGroup.codigo}`;
+                      const containsRecentlyEditedRow = clienteGroup.items.some(row => row.rowIndex === recentlyEditedRowIndex);
+                      const isSourceGroup = groupKey === recentlyEditedPreviousKey && !containsRecentlyEditedRow;
                       return (
                         <div
-                          key={`${row.producto}-${index}`}
+                          key={`cliente-${clienteGroup.cliente}-${clienteGroup.codigo}-${clienteIndex}`}
                           style={{
-                            backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
-                            border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
+                            marginBottom: "1rem",
+                            padding: "0.75rem",
                             borderRadius: "8px",
-                            padding: "1rem",
-                            marginBottom: "0.75rem"
+                            backgroundColor: isSourceGroup ? "#d4edda" : "#f5f5f5",
+                            border: isSourceGroup ? "1px solid #28a745" : "1px solid #d5d5d5",
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                            <div style={{ fontSize: "1.1rem", color: "#333" }}>
-                              {row.cliente}
+                          <div style={{ borderBottom: "1px dotted #999", paddingBottom: "0.4rem", marginBottom: "0.4rem" }}>
+                            <div style={{ fontWeight: 700, fontSize: "1.05rem", color: "#333" }}>
+                              {clienteGroup.cliente} ({clienteGroup.codigo || "N/A"})
                             </div>
-                            <div style={{ fontSize: "0.9rem", color: "#666" }}>
-                              {timeOnly}
-                            </div>
+                            {auxiliar && (
+                              <div style={{ fontStyle: "italic", fontSize: "0.66em", color: "#666" }}>
+                                ({auxiliar})
+                              </div>
+                            )}
                           </div>
-                          <div style={{ display: "grid", gap: "0.25rem", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
-                            <div><span style={{ color: "#666" }}>Descripcion:</span> {producto?.descripcion || row.producto}</div>
-                            <div><span style={{ color: "#666" }}>Presentacion:</span> {presentacion?.presentacion || row.presentacion}</div>
-                            <div><span style={{ color: "#666" }}>Sabor:</span> {sabor?.sabor || row.sabor || "—"}</div>
-                            <div><span style={{ color: "#666" }}>Cantidad:</span> {row.cantidad}</div>
-                            <div><span style={{ color: "#666" }}>Unitario:</span> Q{row.precio_unitario || "—"}</div>
-                            <div><span style={{ color: "#666" }}>Total:</span> Q{row.precio_total || "—"}</div>
-                          </div>
-                          <div style={{ display: "flex", gap: "0.5rem" }}>
-                            <button
-                              onClick={() => onEdit(row)}
-                              style={{
-                                flex: 1,
-                                padding: "0.75rem",
-                                fontSize: "1rem",
-                                backgroundColor: "#2196F3",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                              }}
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleDelete(row)}
-                              style={{
-                                flex: 1,
-                                padding: "0.75rem",
-                                fontSize: "1rem",
-                                backgroundColor: "#dc3545",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                              }}
-                            >
-                              Borrar
-                            </button>
+                          {clienteGroup.items.map((row, itemIndex) => {
+                            const presentacion = presentaciones.find(p => p.correlativo === row.presentacion);
+                            const sabor = sabores.find(s => s.correlativo === row.sabor);
+                            const producto = productos.find(p => p.correlativo === row.producto);
+                            const pago = pagos.find(p => p.correlativo === row.pago);
+                            const isEditing = editingRow?.rowIndex === row.rowIndex;
+                            const descripcion = producto?.descripcion || row.producto;
+                            const saborLabel = sabor?.sabor || row.sabor;
+                            const presentacionLabel = presentacion?.presentacion || row.presentacion;
+                            const detalle = [descripcion, saborLabel, presentacionLabel].filter(Boolean).join(" - ");
+                            const pagoLabel = pago?.pago || row.pago;
+                            const isExpanded = expandedRowIndex === row.rowIndex;
+                            const isRecentlyEdited = row.rowIndex === recentlyEditedRowIndex;
+                            return (
+                              <div
+                                key={`${row.producto}-${itemIndex}`}
+                                data-recent-row-item
+                                style={{
+                                  borderRadius: "6px",
+                                  backgroundColor: isEditing ? "#fff9e6" : isRecentlyEdited ? "#d4edda" : isExpanded ? "#f0f0f0" : "transparent",
+                                  border: isEditing ? "3px solid #f0ad4e" : isRecentlyEdited ? "3px solid #28a745" : "3px solid transparent",
+                                  marginBottom: "0.15rem",
+                                }}
+                              >
+                                <div
+                                  onClick={() => setExpandedRowIndex(isExpanded ? null : row.rowIndex)}
+                                  style={{
+                                    padding: "0.45rem 0.5rem",
+                                    fontSize: "0.92rem",
+                                    color: "#333",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <div style={{ display: "flex", gap: "0.3rem" }}>
+                                    <span style={{ minWidth: "1.4rem" }}>{itemIndex + 1}.</span>
+                                    <span>{detalle}</span>
+                                  </div>
+                                  <div style={{ fontStyle: "italic", display: "flex", justifyContent: "space-between", gap: "0.5rem", marginLeft: "1.7rem" }}>
+                                    <span>{row.cantidad} unidades x {formatCurrency(row.precio_unitario)}</span>
+                                    <span>{pagoLabel ? `(${pagoLabel}) ` : ""}{formatCurrency(row.precio_total)}</span>
+                                  </div>
+                                </div>
+                                {isExpanded && (
+                                  <div style={{ display: "flex", gap: "0.5rem", padding: "0 0.5rem 0.5rem" }}>
+                                    <button
+                                      onClick={() => onEdit(row)}
+                                      style={{
+                                        flex: 1,
+                                        padding: "0.75rem",
+                                        fontSize: "1rem",
+                                        backgroundColor: "#2196F3",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(row)}
+                                      style={{
+                                        flex: 1,
+                                        padding: "0.75rem",
+                                        fontSize: "1rem",
+                                        backgroundColor: "#dc3545",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Borrar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <div style={{ borderTop: "1px dotted #999", marginTop: "0.4rem", paddingTop: "0.4rem", textAlign: "right", fontWeight: 700, color: "#333" }}>
+                            {formatCurrency(total)}
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    });
+                  })()}
                 </div>
               ))}
             </div>
@@ -625,6 +716,16 @@ export function RecentRows({ rows, rutas, presentaciones, sabores, productos, ca
           </div>
         </div>
       )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
+            </div>
+          </div>,
+          document.body,
+        )}
       </div>
     </section>
   );

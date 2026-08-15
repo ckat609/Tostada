@@ -2,6 +2,13 @@ import { appConfig } from "../config";
 
 const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 
+export function formatCurrency(value: string | number | undefined | null): string {
+  if (value === undefined || value === null || value === "") return "—";
+  const num = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(num)) return "—";
+  return `Q${num.toFixed(2)}`;
+}
+
 async function sheetsRequest<T>(
   accessToken: string,
   url: string,
@@ -75,6 +82,8 @@ async function softDeleteRow(
 
 export interface EntryRow {
   fecha: string;
+  codigo: string;
+  pago: string;
   ruta: string;
   cliente: string;
   producto: string;
@@ -105,6 +114,12 @@ export async function addEntryRow(
   );
   const fechaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "fecha"
+  );
+  const codigoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "codigo"
+  );
+  const pagoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "pago"
   );
   const rutaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "ruta"
@@ -162,6 +177,8 @@ export async function addEntryRow(
   const row = new Array(headers.length).fill("");
   if (correlativoIndex !== -1) row[correlativoIndex] = nextCorrelativo;
   if (fechaIndex !== -1) row[fechaIndex] = entry.fecha;
+  if (codigoIndex !== -1) row[codigoIndex] = entry.codigo;
+  if (pagoIndex !== -1) row[pagoIndex] = entry.pago;
   if (rutaIndex !== -1) row[rutaIndex] = entry.ruta;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (productoIndex !== -1) row[productoIndex] = entry.producto;
@@ -189,6 +206,8 @@ interface SheetsValuesResponse {
 
 export interface RecentRow {
   fecha: string;
+  codigo: string;
+  pago: string;
   ruta: string;
   cliente: string;
   producto: string;
@@ -217,6 +236,12 @@ export async function getRecentRows(
   const headers = allRows[0];
   const fechaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "fecha"
+  );
+  const codigoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "codigo"
+  );
+  const pagoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "pago"
   );
   const clienteIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "cliente"
@@ -251,6 +276,8 @@ export async function getRecentRows(
 
       return {
         fecha: fechaIndex !== -1 ? String(row[fechaIndex] ?? "") : "",
+        codigo: codigoIndex !== -1 ? String(row[codigoIndex] ?? "") : "",
+        pago: pagoIndex !== -1 ? String(row[pagoIndex] ?? "") : "",
         ruta: clienteData?.ruta || "",
         cliente: clienteData?.cliente || clienteCorrelativo, // Display cliente name, fallback to correlativo
         producto: productoIndex !== -1 ? String(row[productoIndex] ?? "") : "",
@@ -343,6 +370,15 @@ export interface Vendedor {
 export interface Categoria {
   correlativo: string;
   categoria: string;
+  estado: string;
+  agregado: string;
+  editado: string;
+  rowIndex: number;
+}
+
+export interface Pago {
+  correlativo: string;
+  pago: string;
   estado: string;
   agregado: string;
   editado: string;
@@ -1433,6 +1469,162 @@ export async function getCategorias(
     .filter(c => c.correlativo && c.categoria && c.estado.toLowerCase() !== "deleted");
 }
 
+export async function getPagos(
+  accessToken: string
+): Promise<Pago[]> {
+  const { spreadsheetId } = appConfig.sheets;
+  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent("pagos")}`;
+  const response = await sheetsRequest<SheetsValuesResponse>(accessToken, url);
+
+  const allRows = response.values ?? [];
+  if (allRows.length === 0) return [];
+
+  const headers = allRows[0];
+  const correlativoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "correlativo"
+  );
+  const pagoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "pago"
+  );
+  const estadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "estado"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  if (correlativoIndex === -1 || pagoIndex === -1) {
+    return [];
+  }
+
+  return allRows
+    .slice(1)
+    .map((row, index) => ({
+      correlativo: String(row[correlativoIndex] ?? "").trim(),
+      pago: String(row[pagoIndex] ?? "").trim(),
+      estado: estadoIndex !== -1 ? String(row[estadoIndex] ?? "").trim() : "",
+      agregado: agregadoIndex !== -1 ? String(row[agregadoIndex] ?? "").trim() : "",
+      editado: editadoIndex !== -1 ? String(row[editadoIndex] ?? "").trim() : "",
+      rowIndex: index + 2, // +2 because: +1 for slice(1), +1 for 1-based indexing
+    }))
+    .filter(p => p.correlativo && p.pago && p.estado.toLowerCase() !== "deleted");
+}
+
+export interface NewPago {
+  pago: string;
+}
+
+export async function addPago(
+  accessToken: string,
+  entry: NewPago
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "pagos";
+
+  // First, get all rows to find the next correlativo
+  const allRowsUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}`;
+  const allRowsResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, allRowsUrl);
+  const allRows = allRowsResponse.values ?? [];
+
+  const headers = allRows[0] ?? [];
+  const correlativoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "correlativo"
+  );
+  const pagoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "pago"
+  );
+  const agregadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "agregado"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  // Find the highest correlativo value
+  let nextCorrelativo = 1;
+  if (correlativoIndex !== -1 && allRows.length > 1) {
+    const dataRows = allRows.slice(1);
+    const correlativos = dataRows
+      .map(row => {
+        const val = row[correlativoIndex];
+        return val ? parseInt(String(val)) : 0;
+      })
+      .filter(num => !isNaN(num));
+
+    if (correlativos.length > 0) {
+      nextCorrelativo = Math.max(...correlativos) + 1;
+    }
+  }
+
+  const timestamp = currentTimestamp();
+  const row = new Array(headers.length).fill("");
+  if (correlativoIndex !== -1) row[correlativoIndex] = nextCorrelativo;
+  if (pagoIndex !== -1) row[pagoIndex] = entry.pago;
+  if (agregadoIndex !== -1) row[agregadoIndex] = timestamp;
+  if (editadoIndex !== -1) row[editadoIndex] = timestamp;
+
+  const appendUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, appendUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function updatePago(
+  accessToken: string,
+  rowIndex: number,
+  entry: NewPago
+): Promise<void> {
+  const { spreadsheetId } = appConfig.sheets;
+  const sheetName = "pagos";
+
+  // Get headers to determine column order
+  const headersUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!1:1`;
+  const headerResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, headersUrl);
+  const headers = headerResponse.values?.[0] ?? [];
+
+  // Get existing row to preserve fields we're not updating (like correlativo)
+  const existingRowUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}:${rowIndex}`;
+  const existingRowResponse = await sheetsRequest<SheetsValuesResponse>(accessToken, existingRowUrl);
+  const existingRow = existingRowResponse.values?.[0] ?? [];
+
+  const pagoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "pago"
+  );
+  const editadoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "editado"
+  );
+
+  // Start with existing row to preserve all fields (like correlativo)
+  const row = [...existingRow];
+  while (row.length < headers.length) {
+    row.push("");
+  }
+
+  if (pagoIndex !== -1) row[pagoIndex] = entry.pago;
+  if (editadoIndex !== -1) row[editadoIndex] = currentTimestamp();
+
+  const updateUrl = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A${rowIndex}?valueInputOption=USER_ENTERED`;
+  await sheetsRequest(accessToken, updateUrl, {
+    method: "PUT",
+    body: JSON.stringify({
+      values: [row]
+    })
+  });
+}
+
+export async function deletePago(
+  accessToken: string,
+  rowIndex: number
+): Promise<void> {
+  await softDeleteRow(accessToken, "pagos", rowIndex);
+}
+
 export interface NewCategoria {
   categoria: string;
 }
@@ -1597,6 +1789,12 @@ export async function updateRow(
   const fechaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "fecha"
   );
+  const codigoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "codigo"
+  );
+  const pagoIndex = headers.findIndex(
+    (header) => String(header).toLowerCase() === "pago"
+  );
   const rutaIndex = headers.findIndex(
     (header) => String(header).toLowerCase() === "ruta"
   );
@@ -1642,6 +1840,8 @@ export async function updateRow(
 
   // Update only the fields we're changing
   if (fechaIndex !== -1) row[fechaIndex] = entry.fecha;
+  if (codigoIndex !== -1) row[codigoIndex] = entry.codigo;
+  if (pagoIndex !== -1) row[pagoIndex] = entry.pago;
   if (rutaIndex !== -1) row[rutaIndex] = entry.ruta;
   if (clienteIndex !== -1) row[clienteIndex] = entry.cliente;
   if (productoIndex !== -1) row[productoIndex] = entry.producto;
