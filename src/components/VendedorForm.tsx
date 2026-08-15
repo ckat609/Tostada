@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { addVendedor, updateVendedor, type Vendedor } from "../lib/graph";
 
 interface VendedorFormProps {
@@ -12,6 +13,12 @@ export function VendedorForm({ accessToken, onSaved, editingVendedor, onCancelEd
   const [vendedor, setVendedor] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
 
   useEffect(() => {
     if (editingVendedor) {
@@ -48,12 +55,12 @@ export function VendedorForm({ accessToken, onSaved, editingVendedor, onCancelEd
     try {
       if (editingVendedor) {
         await updateVendedor(accessToken, editingVendedor.rowIndex, { vendedor: vendedor.trim() });
-        setStatus("Actualizado exitosamente.");
+        triggerFlash("Vendedor actualizado");
         onCancelEdit();
         resetForm();
       } else {
         await addVendedor(accessToken, { vendedor: vendedor.trim() });
-        setStatus("Guardado exitosamente.");
+        triggerFlash("Vendedor registrado");
         resetForm();
       }
       await onSaved();
@@ -65,6 +72,7 @@ export function VendedorForm({ accessToken, onSaved, editingVendedor, onCancelEd
   }
 
   return (
+    <>
     <form
       className="card form"
       onSubmit={handleSubmit}
@@ -77,15 +85,24 @@ export function VendedorForm({ accessToken, onSaved, editingVendedor, onCancelEd
         <h2>{editingVendedor ? "Editar vendedor" : "Agregar vendedor"}</h2>
       </div>
 
-      <label>
-        Vendedor
-        <input
-          type="text"
-          value={vendedor}
-          onChange={(event) => setVendedor(event.target.value)}
-          placeholder="Nombre del vendedor"
-        />
-      </label>
+      <input
+        type="text"
+        value={vendedor}
+        onChange={(event) => setVendedor(event.target.value)}
+        placeholder="Nombre del vendedor"
+        style={{
+          width: "100%",
+          padding: "1rem",
+          fontSize: "0.88rem",
+          minHeight: "72px",
+          borderRadius: "8px",
+          border: "2px solid #ddd",
+          backgroundColor: vendedor ? "#2196F3" : "#888",
+          color: "white",
+          WebkitTextFillColor: "white",
+          textAlign: "left",
+        }}
+      />
 
       <div style={{ display: "flex", gap: "0.5rem" }}>
         {editingVendedor && (
@@ -100,5 +117,16 @@ export function VendedorForm({ accessToken, onSaved, editingVendedor, onCancelEd
 
       {status && <p className="status" role="status">{status}</p>}
     </form>
+
+    {flash &&
+      createPortal(
+        <div className="venta-toast-wrap">
+          <div key={flash.key} className="venta-toast">
+            {flash.text}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }

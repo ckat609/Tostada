@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGoogleLogin, googleLogout } from "@react-oauth/google";
 import { appConfig, getConfigurationProblems } from "./config";
 import { EntryForm } from "./components/EntryForm";
@@ -11,13 +11,14 @@ import { CategoriasView } from "./components/CategoriasView";
 import { PresentacionesView } from "./components/PresentacionesView";
 import { SaboresView } from "./components/SaboresView";
 import { ProductosView } from "./components/ProductosView";
-import { getRecentRows, getRutas, getPresentaciones, getProductos, getClientes, getVendedores, getCategorias, getSabores, type RecentRow, type Ruta, type Presentacion, type Producto, type Cliente, type Vendedor, type Categoria, type Sabor } from "./lib/graph";
-import { GOOGLE_SCOPES } from "./auth";
+import { PagosView } from "./components/PagosView";
+import { getRecentRows, getRutas, getPresentaciones, getProductos, getClientes, getVendedores, getCategorias, getSabores, getPagos, type RecentRow, type Ruta, type Presentacion, type Producto, type Cliente, type Vendedor, type Categoria, type Sabor, type Pago } from "./lib/graph";
+import { GOOGLE_SCOPES, loadAuth, saveAuth, clearAuth } from "./auth";
 
 export default function App() {
   const [view, setView] = useState<ViewKey>("ventas");
-  const [accessToken, setAccessToken] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string>("");
+  const [accessToken, setAccessToken] = useState<string>(() => loadAuth()?.accessToken ?? "");
+  const [userEmail, setUserEmail] = useState<string>(() => loadAuth()?.userEmail ?? "");
   const [rows, setRows] = useState<RecentRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [rowError, setRowError] = useState("");
@@ -28,7 +29,10 @@ export default function App() {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [sabores, setSabores] = useState<Sabor[]>([]);
+  const [pagos, setPagos] = useState<Pago[]>([]);
   const [editingRow, setEditingRow] = useState<RecentRow | null>(null);
+  const [recentlyEditedRowIndex, setRecentlyEditedRowIndex] = useState<number | null>(null);
+  const [recentlyEditedPreviousKey, setRecentlyEditedPreviousKey] = useState<string | null>(null);
   const [editingRuta, setEditingRuta] = useState<Ruta | null>(null);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [editingVendedor, setEditingVendedor] = useState<Vendedor | null>(null);
@@ -36,11 +40,26 @@ export default function App() {
   const [editingPresentacion, setEditingPresentacion] = useState<Presentacion | null>(null);
   const [editingSabor, setEditingSabor] = useState<Sabor | null>(null);
   const [editingProducto, setEditingProducto] = useState<Producto | null>(null);
+  const [editingPago, setEditingPago] = useState<Pago | null>(null);
   const configurationProblems = getConfigurationProblems();
 
   const handleEdit = (row: RecentRow) => {
     setEditingRow(row);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const recentlyEditedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleEditSaved = (rowIndex: number, previousCliente: string, previousCodigo: string) => {
+    if (recentlyEditedTimeoutRef.current) {
+      clearTimeout(recentlyEditedTimeoutRef.current);
+    }
+    setRecentlyEditedRowIndex(rowIndex);
+    setRecentlyEditedPreviousKey(`${previousCliente}||${previousCodigo}`);
+    recentlyEditedTimeoutRef.current = setTimeout(() => {
+      setRecentlyEditedRowIndex(null);
+      setRecentlyEditedPreviousKey(null);
+    }, 30000);
   };
 
   const handleEditRuta = (ruta: Ruta) => {
@@ -78,6 +97,11 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleEditPago = (pago: Pago) => {
+    setEditingPago(pago);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const refreshRows = useCallback(async () => {
     if (!accessToken || configurationProblems.length > 0) return;
 
@@ -92,11 +116,12 @@ export default function App() {
         getClientes(accessToken),
         getVendedores(accessToken),
         getCategorias(accessToken),
-        getSabores(accessToken)
+        getSabores(accessToken),
+        getPagos(accessToken)
       ]);
 
       // Extract successful results or use empty arrays for failed ones
-      const [rowsResult, rutasResult, presentacionesResult, productosResult, clientesResult, vendedoresResult, categoriasResult, saboresResult] = results;
+      const [rowsResult, rutasResult, presentacionesResult, productosResult, clientesResult, vendedoresResult, categoriasResult, saboresResult, pagosResult] = results;
 
       setRows(rowsResult.status === "fulfilled" ? rowsResult.value : []);
       setRutas(rutasResult.status === "fulfilled" ? rutasResult.value : []);
@@ -106,6 +131,7 @@ export default function App() {
       setVendedores(vendedoresResult.status === "fulfilled" ? vendedoresResult.value : []);
       setCategorias(categoriasResult.status === "fulfilled" ? categoriasResult.value : []);
       setSabores(saboresResult.status === "fulfilled" ? saboresResult.value : []);
+      setPagos(pagosResult.status === "fulfilled" ? pagosResult.value : []);
 
       // Collect any errors from failed tabs
       const errors = results
@@ -135,12 +161,20 @@ export default function App() {
       });
       const userInfo = await userInfoResponse.json();
       setUserEmail(userInfo.email);
+
+      const expiresInSeconds = Number(tokenResponse.expires_in) || 3600;
+      saveAuth({
+        accessToken: tokenResponse.access_token,
+        userEmail: userInfo.email,
+        expiresAt: Date.now() + expiresInSeconds * 1000,
+      });
     },
     scope: GOOGLE_SCOPES,
   });
 
   function signOut() {
     googleLogout();
+    clearAuth();
     setAccessToken("");
     setUserEmail("");
     setRows([]);
@@ -212,7 +246,7 @@ export default function App() {
 
           {view === "ventas" && (
             <div className="grid">
-              <EntryForm onSaved={refreshRows} accessToken={accessToken} editingRow={editingRow} onCancelEdit={() => setEditingRow(null)} />
+              <EntryForm onSaved={refreshRows} accessToken={accessToken} editingRow={editingRow} onCancelEdit={() => setEditingRow(null)} onEditSaved={handleEditSaved} />
               <RecentRows
                 rows={rows}
                 rutas={rutas}
@@ -220,12 +254,16 @@ export default function App() {
                 sabores={sabores}
                 productos={productos}
                 categorias={categorias}
+                pagos={pagos}
+                clientes={clientes}
                 loading={loadingRows}
                 error={rowError}
                 accessToken={accessToken}
                 onRefresh={refreshRows}
                 onEdit={handleEdit}
                 editingRow={editingRow}
+                recentlyEditedRowIndex={recentlyEditedRowIndex}
+                recentlyEditedPreviousKey={recentlyEditedPreviousKey}
               />
             </div>
           )}
@@ -315,6 +353,18 @@ export default function App() {
               editingProducto={editingProducto}
               onEdit={handleEditProducto}
               onCancelEdit={() => setEditingProducto(null)}
+            />
+          )}
+          {view === "pagos" && (
+            <PagosView
+              accessToken={accessToken}
+              pagos={pagos}
+              loading={loadingRows}
+              error={rowError}
+              onRefresh={refreshRows}
+              editingPago={editingPago}
+              onEdit={handleEditPago}
+              onCancelEdit={() => setEditingPago(null)}
             />
           )}
         </>

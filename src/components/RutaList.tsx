@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Ruta } from "../lib/graph";
 import { deleteRuta } from "../lib/graph";
 
@@ -15,6 +16,28 @@ interface RutaListProps {
 export function RutaList({ rutas, loading, error, accessToken, onRefresh, onEdit, editingRuta }: RutaListProps) {
   const [deletingRuta, setDeletingRuta] = useState<Ruta | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+  const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
+  // Collapse the expanded row's buttons when tapping anything that isn't a row item
+  useEffect(() => {
+    if (expandedRowIndex === null) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-recent-row-item]")) {
+        setExpandedRowIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [expandedRowIndex]);
 
   const sortedRutas = [...rutas].sort((a, b) => a.ruta.localeCompare(b.ruta));
 
@@ -24,6 +47,7 @@ export function RutaList({ rutas, loading, error, accessToken, onRefresh, onEdit
     try {
       await deleteRuta(accessToken, deletingRuta.rowIndex);
       setDeletingRuta(null);
+      triggerFlash("Ruta eliminada");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -137,50 +161,56 @@ export function RutaList({ rutas, loading, error, accessToken, onRefresh, onEdit
           <div className="mobile-only">
             {sortedRutas.map((r) => {
               const isEditing = editingRuta?.rowIndex === r.rowIndex;
+              const isExpanded = expandedRowIndex === r.rowIndex;
               return (
                 <div
                   key={r.rowIndex}
+                  data-recent-row-item
+                  onClick={() => setExpandedRowIndex(isExpanded ? null : r.rowIndex)}
                   style={{
                     backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                     border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
                     borderRadius: "8px",
                     padding: "1rem",
-                    marginBottom: "0.75rem"
+                    marginBottom: "0.75rem",
+                    cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.75rem" }}>{r.ruta}</div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      onClick={() => onEdit(r)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#2196F3",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => setDeletingRuta(r)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Borrar
-                    </button>
-                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: isExpanded ? "0.75rem" : 0 }}>{r.ruta}</div>
+                  {isExpanded && (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(r); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#2196F3",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeletingRuta(r); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -242,6 +272,16 @@ export function RutaList({ rutas, loading, error, accessToken, onRefresh, onEdit
           </div>
         </div>
       )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

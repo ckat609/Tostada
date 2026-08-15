@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Presentacion } from "../lib/graph";
 import { deletePresentacion } from "../lib/graph";
 
@@ -15,6 +16,28 @@ interface PresentacionListProps {
 export function PresentacionList({ presentaciones, loading, error, accessToken, onRefresh, onEdit, editingPresentacion }: PresentacionListProps) {
   const [deletingPresentacion, setDeletingPresentacion] = useState<Presentacion | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
+  const [expandedRowIndex, setExpandedRowIndex] = useState<number | null>(null);
+
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
+  // Collapse the expanded row's buttons when tapping anything that isn't a row item
+  useEffect(() => {
+    if (expandedRowIndex === null) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-recent-row-item]")) {
+        setExpandedRowIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [expandedRowIndex]);
 
   const sortedPresentaciones = [...presentaciones].sort((a, b) => a.presentacion.localeCompare(b.presentacion));
 
@@ -24,6 +47,7 @@ export function PresentacionList({ presentaciones, loading, error, accessToken, 
     try {
       await deletePresentacion(accessToken, deletingPresentacion.rowIndex);
       setDeletingPresentacion(null);
+      triggerFlash("Presentación eliminada");
       onRefresh();
     } catch (err) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : "Error desconocido"));
@@ -137,50 +161,56 @@ export function PresentacionList({ presentaciones, loading, error, accessToken, 
           <div className="mobile-only">
             {sortedPresentaciones.map((p) => {
               const isEditing = editingPresentacion?.rowIndex === p.rowIndex;
+              const isExpanded = expandedRowIndex === p.rowIndex;
               return (
                 <div
                   key={p.rowIndex}
+                  data-recent-row-item
+                  onClick={() => setExpandedRowIndex(isExpanded ? null : p.rowIndex)}
                   style={{
                     backgroundColor: isEditing ? "#fff9e6" : "#f9f9f9",
                     border: isEditing ? "2px solid #f0ad4e" : "1px solid #e0e0e0",
                     borderRadius: "8px",
                     padding: "1rem",
-                    marginBottom: "0.75rem"
+                    marginBottom: "0.75rem",
+                    cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: "0.75rem" }}>{p.presentacion}</div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      onClick={() => onEdit(p)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#2196F3",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => setDeletingPresentacion(p)}
-                      style={{
-                        flex: 1,
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        backgroundColor: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Borrar
-                    </button>
-                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#333", marginBottom: isExpanded ? "0.75rem" : 0 }}>{p.presentacion}</div>
+                  {isExpanded && (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#2196F3",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeletingPresentacion(p); }}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem",
+                          fontSize: "1rem",
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -242,6 +272,16 @@ export function PresentacionList({ presentaciones, loading, error, accessToken, 
           </div>
         </div>
       )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

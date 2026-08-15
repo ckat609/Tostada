@@ -1,18 +1,21 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { addEntryRow, updateRow, getProductos, getPresentaciones, getSabores, getRutas, getClientes, getCategorias, type Producto, type Presentacion, type Sabor, type Ruta, type Cliente, type RecentRow, type Categoria } from "../lib/graph";
+import { addEntryRow, updateRow, getProductos, getPresentaciones, getSabores, getRutas, getClientes, getCategorias, getPagos, type Producto, type Presentacion, type Sabor, type Ruta, type Cliente, type RecentRow, type Categoria, type Pago } from "../lib/graph";
 
 interface EntryFormProps {
   onSaved: () => void | Promise<void>;
   accessToken: string;
   editingRow: RecentRow | null;
   onCancelEdit: () => void;
+  onEditSaved: (rowIndex: number, previousCliente: string, previousCodigo: string) => void;
 }
 
-type ModalType = "ruta" | "cliente" | "categoria" | "producto" | "presentacion" | "sabor" | null;
+type ModalType = "ruta" | "cliente" | "categoria" | "producto" | "presentacion" | "sabor" | "pago" | null;
 
-export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: EntryFormProps) {
+export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit, onEditSaved }: EntryFormProps) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [codigo, setCodigo] = useState("");
+  const [pagoCorrelativo, setPagoCorrelativo] = useState("");
   const [ruta, setRuta] = useState("");
   const [cliente, setCliente] = useState("");
   const [description, setDescription] = useState("");
@@ -21,6 +24,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [amount, setAmount] = useState("");
   const [precio, setPrecio] = useState("");
   const [status, setStatus] = useState<string>("");
+  const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
@@ -38,6 +42,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loadingCategorias, setLoadingCategorias] = useState(false);
   const [categoriaFilter, setCategoriaFilter] = useState(""); // Filter only, not saved
+  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [loadingPagos, setLoadingPagos] = useState(false);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   // Prevent body scroll when modal is open
@@ -63,6 +69,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
 
   const selectedRuta = rutas.find((r) => r.ruta === ruta);
   const filteredClientes = selectedRuta ? clientes.filter((c) => c.ruta === selectedRuta.correlativo) : [];
+  const selectedCliente = clientes.find((c) => c.cliente === cliente);
+  const selectedPago = pagos.find((p) => p.correlativo === pagoCorrelativo);
 
   // Get unique descripciones filtered by categoria
   const filteredProductos = categoriaFilter ? productos.filter((p) => p.categoria === categoriaFilter) : productos;
@@ -96,6 +104,45 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
 
   // Get selected sabor by correlativo
   const selectedSabor = sabores.find((s) => s.correlativo === saborCorrelativo);
+
+  // Auto-select fields that only have one available option
+  useEffect(() => {
+    if (!ruta && rutas.length === 1) {
+      setRuta(rutas[0].ruta);
+    }
+  }, [ruta, rutas]);
+
+  useEffect(() => {
+    if (!cliente && filteredClientes.length === 1) {
+      setCliente(filteredClientes[0].cliente);
+    }
+  }, [cliente, filteredClientes]);
+
+  useEffect(() => {
+    if (!categoriaFilter && categorias.length === 1) {
+      setCategoriaFilter(categorias[0].correlativo);
+    }
+  }, [categoriaFilter, categorias]);
+
+  useEffect(() => {
+    if (!description && uniqueDescripciones.length === 1) {
+      setDescription(uniqueDescripciones[0]);
+      setProductoCorrelativo("");
+      setSaborCorrelativo("");
+    }
+  }, [description, uniqueDescripciones]);
+
+  useEffect(() => {
+    if (!productoCorrelativo && availablePresentaciones.length === 1) {
+      setProductoCorrelativo(availablePresentaciones[0].correlativo);
+    }
+  }, [productoCorrelativo, availablePresentaciones]);
+
+  useEffect(() => {
+    if (!saborCorrelativo && availableSabores.length === 1) {
+      setSaborCorrelativo(availableSabores[0].correlativo);
+    }
+  }, [saborCorrelativo, availableSabores]);
 
   useEffect(() => {
     async function fetchProductos() {
@@ -176,6 +223,24 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
   }, [accessToken]);
 
   useEffect(() => {
+    async function fetchPagos() {
+      if (!accessToken) return;
+
+      setLoadingPagos(true);
+      try {
+        const pagosData = await getPagos(accessToken);
+        setPagos(pagosData);
+      } catch (error) {
+        console.error("Could not load pagos:", error);
+      } finally {
+        setLoadingPagos(false);
+      }
+    }
+
+    void fetchPagos();
+  }, [accessToken]);
+
+  useEffect(() => {
     async function fetchRutas() {
       if (!accessToken) return;
 
@@ -233,6 +298,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
       const productoData = productos.find((p) => p.correlativo === editingRow.producto);
 
       setDate(editingRow.fecha);
+      setCodigo(editingRow.codigo);
+      setPagoCorrelativo(editingRow.pago);
       setRuta(rutaData?.ruta || "");
       setCliente(editingRow.cliente);
       setDescription(productoData?.descripcion || "");
@@ -243,6 +310,11 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
   }, [editingRow, productos, rutas, presentaciones, sabores]);
 
+  function triggerFlash(text: string) {
+    setFlash({ text, key: Date.now() });
+    setTimeout(() => setFlash(null), 2000);
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -252,13 +324,15 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     }
 
     const parsedAmount = Number(amount);
-    const parsedPrecio = Number(precio);
-    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !precio || !Number.isFinite(parsedPrecio) || parsedPrecio <= 0) {
+    const rawParsedPrecio = Number(precio);
+    if (!date || !ruta || !cliente || !description.trim() || !productoCorrelativo || !amount || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !precio || !Number.isFinite(rawParsedPrecio) || rawParsedPrecio <= 0) {
       setStatus("Por favor completa todos los campos requeridos.");
       return;
     }
 
-    const precioTotal = parsedAmount * parsedPrecio;
+    // Round to cents so precio always saves as QXX.XX
+    const parsedPrecio = Math.round(rawParsedPrecio * 100) / 100;
+    const precioTotal = Math.round(parsedAmount * parsedPrecio * 100) / 100;
 
     // Find ruta correlativo from ruta name
     const rutaData = rutas.find((r) => r.ruta === ruta);
@@ -292,6 +366,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         // Update existing row - keep original timestamp
         await updateRow(accessToken, editingRow.rowIndex, {
           fecha: editingRow.fecha, // Keep original timestamp when editing
+          codigo, // Store codigo
+          pago: pagoCorrelativo, // Store pago correlativo
           ruta: rutaData.correlativo, // Store ruta correlativo
           cliente: clienteData.correlativo, // Store cliente correlativo
           producto: productoData.correlativo, // Store producto correlativo
@@ -301,10 +377,13 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
           precio_unitario: parsedPrecio,
           precio_total: precioTotal,
         });
-        setStatus("Actualizado exitosamente.");
+        onEditSaved(editingRow.rowIndex, editingRow.cliente, editingRow.codigo);
+        triggerFlash("Venta actualizada");
         onCancelEdit();
         // Reset form
         setDate(new Date().toISOString().slice(0, 10));
+        setCodigo("");
+        setPagoCorrelativo("");
         setRuta("");
         setCliente("");
         setDescription("");
@@ -315,6 +394,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         // Add new row - use timestamp for new entries
         await addEntryRow(accessToken, {
           fecha: timestamp, // Store timestamp instead of just date
+          codigo, // Store codigo
+          pago: pagoCorrelativo, // Store pago correlativo
           ruta: rutaData.correlativo, // Store ruta correlativo
           cliente: clienteData.correlativo, // Store cliente correlativo
           producto: productoData.correlativo, // Store producto correlativo
@@ -326,7 +407,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         });
         setAmount("");
         setPrecio("");
-        setStatus("Guardado exitosamente.");
+        triggerFlash("Venta registrada");
       }
       await onSaved();
     } catch (error) {
@@ -340,6 +421,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
     onCancelEdit();
     // Reset form
     setDate(new Date().toISOString().slice(0, 10));
+    setCodigo("");
+    setPagoCorrelativo("");
     setRuta("");
     setCliente("");
     setDescription("");
@@ -363,6 +446,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             type="button"
             onClick={() => {
               setDate(new Date().toISOString().slice(0, 10));
+              setCodigo("");
+              setPagoCorrelativo("");
               setRuta("");
               setCliente("");
               setDescription("");
@@ -390,8 +475,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             style={{
               width: "100%",
               padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
+              fontSize: "0.88rem",
+              minHeight: "72px",
               borderRadius: "8px",
               border: "2px solid #ddd",
               backgroundColor: date ? "#2196F3" : "#888",
@@ -401,6 +486,9 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               display: "flex",
               alignItems: "center",
               pointerEvents: "none",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {new Date(date + "T00:00:00").toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -422,6 +510,53 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
         </div>
 
         <div className="two-col-grid-always">
+          <input
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value)}
+            placeholder="Código"
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "0.88rem",
+              minHeight: "72px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: codigo ? "#2196F3" : "#888",
+              color: "white",
+              WebkitTextFillColor: "white",
+              textAlign: "left",
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => setActiveModal("pago")}
+            disabled={loadingPagos}
+            style={{
+              width: "100%",
+              padding: "1rem",
+              fontSize: "0.88rem",
+              minHeight: "72px",
+              borderRadius: "8px",
+              border: "2px solid #ddd",
+              backgroundColor: pagoCorrelativo ? "#2196F3" : "#888",
+              cursor: "pointer",
+              textAlign: "left",
+              color: "white",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {loadingPagos ? "Cargando..." : selectedPago?.pago || "Forma de pago"}
+          </button>
+        </div>
+
+        <div className="two-col-grid-always">
           <div>
             <button
               type="button"
@@ -430,14 +565,20 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               style={{
                 width: "100%",
                 padding: "1rem",
-                fontSize: "1.1rem",
-                minHeight: "56px",
+                fontSize: "0.88rem",
+                minHeight: "72px",
                 borderRadius: "8px",
                 border: "2px solid #ddd",
                 backgroundColor: ruta ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
                 color: "white",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               {loadingRutas ? "Cargando..." : ruta || "Ruta"}
@@ -457,17 +598,28 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               style={{
                 width: "100%",
                 padding: "1rem",
-                fontSize: "1.1rem",
-                minHeight: "56px",
+                fontSize: "0.88rem",
+                minHeight: "72px",
                 borderRadius: "8px",
                 border: "2px solid #ddd",
                 backgroundColor: cliente ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
                 color: "white",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                gap: "0.15rem",
               }}
             >
-              {!ruta ? "Selecciona ruta" : loadingClientes ? "Cargando..." : cliente || "Cliente"}
+              <span style={{ width: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {!ruta ? "Selecciona ruta" : loadingClientes ? "Cargando..." : cliente || "Cliente"}
+              </span>
+              {ruta && cliente && !loadingClientes && selectedCliente?.auxiliar && (
+                <span style={{ width: "100%", fontSize: "0.66em", opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  ({selectedCliente.auxiliar})
+                </span>
+              )}
             </button>
             {clientesError && (
               <p className="status" style={{ color: "red", fontSize: "0.875rem", marginTop: "0.25rem" }}>
@@ -485,14 +637,20 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             style={{
               width: "100%",
               padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
+              fontSize: "0.88rem",
+              minHeight: "72px",
               borderRadius: "8px",
               border: "2px solid #ddd",
               backgroundColor: categoriaFilter ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
               color: "white",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {loadingCategorias ? "Cargando..." : categorias.find((c) => c.correlativo === categoriaFilter)?.categoria || "Categoría"}
@@ -506,14 +664,20 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
               style={{
                 width: "100%",
                 padding: "1rem",
-                fontSize: "1.1rem",
-                minHeight: "56px",
+                fontSize: "0.88rem",
+                minHeight: "72px",
                 borderRadius: "8px",
                 border: "2px solid #ddd",
                 backgroundColor: description ? "#2196F3" : "#888",
                 cursor: "pointer",
                 textAlign: "left",
                 color: "white",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               {loadingProductos ? "Cargando..." : description || "Producto"}
@@ -534,14 +698,20 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             style={{
               width: "100%",
               padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
+              fontSize: "0.88rem",
+              minHeight: "72px",
               borderRadius: "8px",
               border: "2px solid #ddd",
               backgroundColor: selectedPresentacion ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
               color: "white",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {!description ? "Selecciona producto" : selectedPresentacion?.presentacion || "Presentación"}
@@ -554,15 +724,21 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             style={{
               width: "100%",
               padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
+              fontSize: "0.88rem",
+              minHeight: "72px",
               borderRadius: "8px",
               border: "2px solid #ddd",
               backgroundColor: selectedSabor ? "#2196F3" : "#888",
               cursor: "pointer",
               textAlign: "left",
               color: "white",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
               opacity: sabores.length === 0 || availableSabores.length === 0 ? 0.5 : 1,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {!description ? "Selecciona producto" : selectedSabor?.sabor || "Sabor"}
@@ -580,8 +756,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             style={{
               width: "100%",
               padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
+              fontSize: "0.88rem",
+              minHeight: "72px",
               borderRadius: "8px",
               border: "2px solid #ddd",
               backgroundColor: amount ? "#2196F3" : "#888",
@@ -601,8 +777,8 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
             style={{
               width: "100%",
               padding: "1rem",
-              fontSize: "1.1rem",
-              minHeight: "56px",
+              fontSize: "0.88rem",
+              minHeight: "72px",
               borderRadius: "8px",
               border: "2px solid #ddd",
               backgroundColor: precio ? "#2196F3" : "#888",
@@ -705,6 +881,7 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                   {activeModal === "producto" && "Selecciona Producto"}
                   {activeModal === "presentacion" && "Selecciona Presentación"}
                   {activeModal === "sabor" && "Selecciona Sabor"}
+                  {activeModal === "pago" && "Selecciona Forma de Pago"}
                 </h3>
                 <button
                   onClick={() => setActiveModal(null)}
@@ -777,66 +954,45 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                           minHeight: "70px",
                           transition: "all 0.2s",
                           color: "#000",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.15rem",
                         }}
                       >
-                        {c.cliente}
+                        <span>{c.cliente}</span>
+                        {c.auxiliar && <span style={{ fontSize: "0.66em", opacity: 0.75 }}>({c.auxiliar})</span>}
                       </button>
                     ))}
-                {activeModal === "categoria" && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setCategoriaFilter("");
-                        setDescription("");
-                        setProductoCorrelativo("");
-                        setSaborCorrelativo("");
-                        setActiveModal(null);
-                      }}
-                      style={{
-                        padding: "1.25rem",
-                        fontSize: "1.1rem",
-                        border: "2px solid #ddd",
-                        backgroundColor: !categoriaFilter ? "#e3f2fd" : "white",
-                        borderColor: !categoriaFilter ? "#2196F3" : "#ddd",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        minHeight: "70px",
-                        transition: "all 0.2s",
-                        color: "#000",
-                      }}
-                    >
-                      Todas las categorías
-                    </button>
-                    {[...categorias]
-                      .sort((a, b) => a.categoria.localeCompare(b.categoria))
-                      .map((c) => (
-                        <button
-                          key={c.correlativo}
-                          onClick={() => {
-                            setCategoriaFilter(c.correlativo);
-                            setDescription(""); // Reset producto when categoria changes
-                            setProductoCorrelativo("");
-                            setSaborCorrelativo("");
-                            setActiveModal(null);
-                          }}
-                          style={{
-                            padding: "1.25rem",
-                            fontSize: "1.1rem",
-                            border: "2px solid #ddd",
-                            backgroundColor: categoriaFilter === c.correlativo ? "#e3f2fd" : "white",
-                            borderColor: categoriaFilter === c.correlativo ? "#2196F3" : "#ddd",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                            minHeight: "70px",
-                            transition: "all 0.2s",
-                            color: "#000",
-                          }}
-                        >
-                          {c.categoria}
-                        </button>
-                      ))}
-                  </>
-                )}
+                {activeModal === "categoria" &&
+                  [...categorias]
+                    .sort((a, b) => a.categoria.localeCompare(b.categoria))
+                    .map((c) => (
+                      <button
+                        key={c.correlativo}
+                        onClick={() => {
+                          setCategoriaFilter(c.correlativo);
+                          setDescription(""); // Reset producto when categoria changes
+                          setProductoCorrelativo("");
+                          setSaborCorrelativo("");
+                          setActiveModal(null);
+                        }}
+                        style={{
+                          padding: "1.25rem",
+                          fontSize: "1.1rem",
+                          border: "2px solid #ddd",
+                          backgroundColor: categoriaFilter === c.correlativo ? "#e3f2fd" : "white",
+                          borderColor: categoriaFilter === c.correlativo ? "#2196F3" : "#ddd",
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          minHeight: "70px",
+                          transition: "all 0.2s",
+                          color: "#000",
+                        }}
+                      >
+                        {c.categoria}
+                      </button>
+                    ))}
                 {activeModal === "producto" &&
                   uniqueDescripciones.map((desc) => (
                     <button
@@ -911,7 +1067,43 @@ export function EntryForm({ onSaved, accessToken, editingRow, onCancelEdit }: En
                       {s.sabor}
                     </button>
                   ))}
+                {activeModal === "pago" &&
+                  [...pagos]
+                    .sort((a, b) => a.pago.localeCompare(b.pago))
+                    .map((p) => (
+                      <button
+                        key={p.correlativo}
+                        onClick={() => {
+                          setPagoCorrelativo(p.correlativo);
+                          setActiveModal(null);
+                        }}
+                        style={{
+                          padding: "1.25rem",
+                          fontSize: "1.1rem",
+                          border: "2px solid #ddd",
+                          backgroundColor: pagoCorrelativo === p.correlativo ? "#e3f2fd" : "white",
+                          borderColor: pagoCorrelativo === p.correlativo ? "#2196F3" : "#ddd",
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          minHeight: "70px",
+                          transition: "all 0.2s",
+                          color: "#000",
+                        }}
+                      >
+                        {p.pago}
+                      </button>
+                    ))}
               </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {flash &&
+        createPortal(
+          <div className="venta-toast-wrap">
+            <div key={flash.key} className="venta-toast">
+              {flash.text}
             </div>
           </div>,
           document.body,

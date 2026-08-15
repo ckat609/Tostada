@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { addRuta, updateRuta, type Ruta } from "../lib/graph";
+import { addPago, updatePago, type Pago } from "../lib/graph";
 
-interface RutaFormProps {
+interface PagoFormProps {
   accessToken: string;
   onSaved: () => void | Promise<void>;
-  editingRuta: Ruta | null;
+  editingPago: Pago | null;
   onCancelEdit: () => void;
 }
 
-export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: RutaFormProps) {
-  const [ruta, setRuta] = useState("");
+export function PagoForm({ accessToken, onSaved, editingPago, onCancelEdit }: PagoFormProps) {
+  const [pago, setPago] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
@@ -21,13 +21,13 @@ export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: Ru
   }
 
   useEffect(() => {
-    if (editingRuta) {
-      setRuta(editingRuta.ruta);
+    if (editingPago) {
+      setPago(editingPago.pago);
     }
-  }, [editingRuta]);
+  }, [editingPago]);
 
   function resetForm() {
-    setRuta("");
+    setPago("");
   }
 
   function handleCancel() {
@@ -44,7 +44,7 @@ export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: Ru
       return;
     }
 
-    if (!ruta.trim()) {
+    if (!pago.trim()) {
       setStatus("Por favor completa todos los campos requeridos.");
       return;
     }
@@ -53,14 +53,14 @@ export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: Ru
     setStatus("");
 
     try {
-      if (editingRuta) {
-        await updateRuta(accessToken, editingRuta.rowIndex, { ruta: ruta.trim() });
-        triggerFlash("Ruta actualizada");
+      if (editingPago) {
+        await updatePago(accessToken, editingPago.rowIndex, { pago: pago.trim() });
+        triggerFlash("Forma de pago actualizada");
         onCancelEdit();
         resetForm();
       } else {
-        await addRuta(accessToken, { ruta: ruta.trim() });
-        triggerFlash("Ruta registrada");
+        await addPago(accessToken, { pago: pago.trim() });
+        triggerFlash("Forma de pago registrada");
         resetForm();
       }
       await onSaved();
@@ -76,20 +76,20 @@ export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: Ru
     <form
       className="card form"
       onSubmit={handleSubmit}
-      style={{ backgroundColor: editingRuta ? "#fff9e6" : "white", border: editingRuta ? "3px solid #f0ad4e" : undefined }}
+      style={{ backgroundColor: editingPago ? "#fff9e6" : "white", border: editingPago ? "3px solid #f0ad4e" : undefined }}
     >
       <div>
-        <p className="eyebrow" style={{ color: editingRuta ? "#f0ad4e" : undefined }}>
-          {editingRuta ? "Editando ruta" : "Nueva entrada"}
+        <p className="eyebrow" style={{ color: editingPago ? "#f0ad4e" : undefined }}>
+          {editingPago ? "Editando forma de pago" : "Nueva entrada"}
         </p>
-        <h2>{editingRuta ? "Editar ruta" : "Agregar ruta"}</h2>
+        <h2>{editingPago ? "Editar forma de pago" : "Agregar forma de pago"}</h2>
       </div>
 
       <input
         type="text"
-        value={ruta}
-        onChange={(event) => setRuta(event.target.value)}
-        placeholder="Nombre de la ruta"
+        value={pago}
+        onChange={(event) => setPago(event.target.value)}
+        placeholder="Nombre de la forma de pago"
         style={{
           width: "100%",
           padding: "1rem",
@@ -97,7 +97,7 @@ export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: Ru
           minHeight: "72px",
           borderRadius: "8px",
           border: "2px solid #ddd",
-          backgroundColor: ruta ? "#2196F3" : "#888",
+          backgroundColor: pago ? "#2196F3" : "#888",
           color: "white",
           WebkitTextFillColor: "white",
           textAlign: "left",
@@ -105,13 +105,13 @@ export function RutaForm({ accessToken, onSaved, editingRuta, onCancelEdit }: Ru
       />
 
       <div style={{ display: "flex", gap: "0.5rem" }}>
-        {editingRuta && (
+        {editingPago && (
           <button type="button" className="secondary" style={{ flex: 1 }} onClick={handleCancel}>
             Cancelar
           </button>
         )}
-        <button type="submit" style={{ flex: 1 }} disabled={saving || !ruta.trim()}>
-          {saving ? (editingRuta ? "Actualizando…" : "Guardando…") : (editingRuta ? "Actualizar" : "Guardar")}
+        <button type="submit" style={{ flex: 1 }} disabled={saving || !pago.trim()}>
+          {saving ? (editingPago ? "Actualizando…" : "Guardando…") : (editingPago ? "Actualizar" : "Guardar")}
         </button>
       </div>
 
